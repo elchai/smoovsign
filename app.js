@@ -131,7 +131,7 @@ function renderTemplates(el) {
             <div class="empty-state">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                 <h2>אין תבניות עדיין</h2>
-                <p>צור תבנית עם שדות קבועים ודינמיים - חוסך זמן בכל שליחה!</p>
+                <p>צור תבנית עם שדות מוכנים ושדות למילוי - חוסך זמן בכל שליחה!</p>
                 <button class="btn btn-primary btn-lg" onclick="newTemplate()">+ צור תבנית</button>
             </div>
         ` : `<div class="doc-list">${DM.templates.map(t => `
@@ -139,7 +139,7 @@ function renderTemplates(el) {
                 <div class="template-icon" style="background:var(--primary-light);">📄</div>
                 <div class="doc-info">
                     <h3>${t.name || 'תבנית ללא שם'}</h3>
-                    <div class="doc-meta">${t.fields ? t.fields.length + ' שדות' : ''} · ${t.fixedFields ? t.fixedFields.filter(f => f.value).length + ' שדות קבועים' : ''}</div>
+                    <div class="doc-meta">${t.fields ? t.fields.length + ' שדות' : ''} · ${t.fixedFields ? t.fixedFields.filter(f => f.value).length + ' שדות מוכנים' : ''}</div>
                 </div>
                 <div class="doc-actions">
                     <button class="btn btn-sm btn-primary" onclick="useTemplate('${t.id}')">שלח מתבנית</button>
@@ -295,7 +295,7 @@ function renderStep() {
 function renderUpload(el) {
     el.innerHTML = `<div class="upload-area">
         <h2 style="font-size:1.3em;font-weight:700;margin-bottom:6px;">${DM.isTemplate ? 'העלאת מסמך לתבנית' : 'בחירת מסמך'}</h2>
-        <p style="color:var(--text-light);margin-bottom:24px;">${DM.isTemplate ? 'העלה את המסמך שישמש כתבנית. שדות קבועים ימולאו מראש.' : 'העלה מסמך PDF או תמונה להחתמה'}</p>
+        <p style="color:var(--text-light);margin-bottom:24px;">${DM.isTemplate ? 'העלה את המסמך שישמש כתבנית. שדות מוכנים ימולאו מראש.' : 'העלה מסמך PDF או תמונה להחתמה'}</p>
         <div class="upload-card">
             ${DM.docImage ? `
                 <div class="file-preview">
@@ -392,8 +392,8 @@ function renderRecipients(el) {
         <button class="add-recipient-btn" onclick="addRecipient()">+ הוסף נמען</button>
         ${soldiers.length > 0 ? `
             <div class="soldier-picker">
-                <label class="form-label" style="font-size:0.88em;font-weight:700;">הוסף חיילים מהמערכת</label>
-                <input type="text" class="form-input" placeholder="חפש חייל..." value="${DM.recipientSearch}" oninput="DM.recipientSearch=this.value;renderSoldierChips()">
+                <label class="form-label" style="font-size:0.88em;font-weight:700;">הוסף אנשי קשר מהמערכת</label>
+                <input type="text" class="form-input" placeholder="חפש..." value="${DM.recipientSearch}" oninput="DM.recipientSearch=this.value;renderSoldierChips()">
                 <div class="soldier-chips" id="soldierChips">
                     ${renderSoldierChipsHTML(soldiers)}
                 </div>
@@ -466,7 +466,7 @@ function renderFieldEditor(el) {
 
         <!-- Center: Canvas -->
         <div class="editor-canvas" onclick="deselectField(event)" id="canvasArea">
-            <div class="doc-container" id="docContainer">
+            <div class="doc-container" id="docContainer" onclick="onCanvasClick(event)">
                 ${DM.docImage ? `<img src="${DM.docImage}" alt="doc" id="docImage" onload="onDocImageLoad()">` : '<div style="height:1130px;"></div>'}
                 <div class="fields-layer" id="fieldsLayer">
                     ${DM.fields.map(f => renderFieldOnCanvas(f)).join('')}
@@ -480,8 +480,8 @@ function renderFieldEditor(el) {
                 ${DM.isTemplate ? `
                     <div class="form-label" style="margin-bottom:6px;">סוג שדה</div>
                     <div style="display:flex;gap:4px;margin-bottom:8px;">
-                        <button class="btn btn-sm ${!DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=false;" style="flex:1;">דינמי (לחייל)</button>
-                        <button class="btn btn-sm ${DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=true;" style="flex:1;">קבוע (מ"פ)</button>
+                        <button class="btn btn-sm ${!DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=false;" style="flex:1;">דינמי (למילוי)</button>
+                        <button class="btn btn-sm ${DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=true;" style="flex:1;">קבוע (מוכן)</button>
                     </div>
                 ` : `
                     <div class="form-label" style="margin-bottom:6px;">הוסף שדה עבור</div>
@@ -511,6 +511,9 @@ function renderFieldEditor(el) {
         area.ontouchmove = e => { if (DM.isDragging || DM.isResizing) { e.preventDefault(); handleMouseMove(e.touches[0]); } };
         area.ontouchend = handleMouseUp;
     }
+    // Set cursor based on pending field mode
+    const docCont = document.getElementById('docContainer');
+    if (docCont) docCont.style.cursor = DM._pendingFieldType ? 'crosshair' : 'default';
 }
 
 function toolBtn(type, label, icon) {
@@ -574,14 +577,13 @@ function renderFieldOnCanvas(f) {
     const selected = DM.selectedFieldId === f.id;
     const typeLabels = { signature: 'חתימה', date: 'תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓' };
     const displayText = f.value || typeLabels[f.type] || f.label || 'טקסט';
-    const fixedBadge = f.fixed ? ' 🔒' : '';
 
     return `<div class="field-box ${selected ? 'selected' : ''}" data-fid="${f.id}"
         style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;z-index:${selected ? 20 : 10};"
         onmousedown="fieldMouseDown(event,${f.id})" ontouchstart="fieldTouchStart(event,${f.id})"
         onclick="event.stopPropagation();selectField(${f.id})" ondblclick="event.stopPropagation();editFieldInline(${f.id})">
         ${selected ? `
-            <div class="field-label-tag" style="background:${c.fill};">${f.label}${f.required ? ' *' : ''}${fixedBadge}</div>
+            <div class="field-label-tag" style="background:${c.fill};">${f.label}${f.required ? ' *' : ''}</div>
             <div class="field-toolbar">
                 <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">✏️</button>
                 <button onclick="event.stopPropagation();deleteField(${f.id})" title="מחק">🗑️</button>
@@ -593,25 +595,51 @@ function renderFieldOnCanvas(f) {
             <div class="resize-handle" style="bottom:-4px;right:-4px;border-color:${c.fill};cursor:se-resize;" onmousedown="resizeMouseDown(event,${f.id},'se')"></div>
         ` : ''}
         <div class="field-inner" ${selected ? `style="background:${c.bg};border-color:${c.border};color:${c.text};"` : ''}>
-            <span style="padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayText}${fixedBadge}</span>
+            <span style="padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayText}</span>
         </div>
     </div>`;
 }
 
 // ==================== FIELD ACTIONS ====================
+// Store pending field type when user clicks a tool button
+// Then place field at next click on the document canvas
+DM._pendingFieldType = null;
+DM._pendingFieldLabel = null;
+
 function addField(type, label) {
+    // Set pending - next click on document will place the field
+    DM._pendingFieldType = type;
+    DM._pendingFieldLabel = label;
+    // Change cursor to crosshair on canvas
     const container = document.getElementById('docContainer');
-    const cw = container ? container.offsetWidth : 800;
-    const ch = container ? container.offsetHeight : 1130;
+    if (container) container.style.cursor = 'crosshair';
+    toast('לחץ על המסמך למיקום השדה', 'info');
+}
+
+function onCanvasClick(e) {
+    // If there's a pending field, place it at click position
+    if (!DM._pendingFieldType) return;
+    // Don't place if clicking on an existing field
+    if (e.target.closest && e.target.closest('.field-box')) return;
+
+    const container = document.getElementById('docContainer');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const type = DM._pendingFieldType;
+    const label = DM._pendingFieldLabel;
     const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
     const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 30 : 140;
     const defaultH = type === 'signature' ? 50 : type === 'checkbox' ? 30 : 32;
 
+    // Place field centered on click position
     const f = {
         id: Date.now() + Math.random(),
         type, label, value: '',
-        x: (cw * 0.3) + (DM.fields.length * 15) % 100,
-        y: (ch * 0.15) + (DM.fields.length * 25) % 200,
+        x: Math.max(0, clickX - defaultW / 2),
+        y: Math.max(0, clickY - defaultH / 2),
         w: defaultW, h: defaultH,
         required: true,
         assigneeId: assignee ? assignee.id : null,
@@ -619,13 +647,22 @@ function addField(type, label) {
     };
     DM.fields.push(f);
     DM.selectedFieldId = f.id;
+
+    // Clear pending
+    DM._pendingFieldType = null;
+    DM._pendingFieldLabel = null;
+
+    e.stopPropagation();
     render();
 }
 
 function selectField(id) { DM.selectedFieldId = id; render(); }
 function deselectField(e) {
-    if (e.target.id === 'canvasArea' || e.target.classList.contains('doc-container') || e.target.tagName === 'IMG' || e.target.classList.contains('fields-layer')) {
-        DM.selectedFieldId = null; render();
+    if (e.target.id === 'canvasArea') {
+        DM.selectedFieldId = null;
+        DM._pendingFieldType = null;
+        DM._pendingFieldLabel = null;
+        render();
     }
 }
 function updateField(id, key, val) { const f = DM.fields.find(x => x.id === id); if (f) { f[key] = val; render(); } }
