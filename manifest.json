@@ -1,0 +1,26 @@
+{
+    "name": "Smoov - חתימה דיגיטלית",
+    "short_name": "Smoov",
+    "description": "Smoov - מערכת חתימה דיגיטלית לניהול מסמכים",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#f1f5f9",
+    "theme_color": "#2563eb",
+    "orientation": "any",
+    "lang": "he",
+    "dir": "rtl",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%232563eb'/%3E%3Cpath d='M119 61c-12-7-27-9-40-4s-21 19-21 33c0 12 6 21 15 27s27 9 40 4c6-2 10-6 14-11' stroke='white' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M96 130l24 18M120 130l-24 18' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%232563eb'/%3E%3Cpath d='M318 163c-31-19-71-24-107-11s-56 50-56 87c0 31 16 56 40 72s71 24 107 11c15-5 27-15 37-29' stroke='white' stroke-width='28' stroke-linecap='round' fill='none'/%3E%3Cpath d='M256 348l64 48M320 348l-64 48' stroke='white' stroke-width='16' stroke-linecap='round'/%3E%3C/svg%3E",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}
