@@ -786,7 +786,8 @@ function sendDocument() {
             const phone = r.phone.replace(/[^0-9]/g, '');
             if (phone.length >= 9) {
                 const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
-                const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${location.href}`;
+                const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+                const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${signUrl}`;
                 window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
             }
         }
@@ -990,4 +991,19 @@ const style = document.createElement('style');
 style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 document.head.appendChild(style);
 
-render();
+// Check URL hash for direct document signing link (e.g. #sign/dm_123456)
+function checkUrlHash() {
+    const hash = location.hash;
+    if (hash.startsWith('#sign/')) {
+        const docId = hash.substring(6);
+        const doc = DM.docs.find(d => d.id === docId);
+        if (doc) {
+            openSign(docId);
+            return true;
+        }
+    }
+    return false;
+}
+
+if (!checkUrlHash()) render();
+window.addEventListener('hashchange', () => { checkUrlHash(); });
