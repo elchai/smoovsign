@@ -1,4 +1,4 @@
-/* ==================== DocsMove - Digital Signature System ==================== */
+/* ==================== Smoov - Digital Signature System ==================== */
 :root {
     --primary: #2563eb;
     --primary-light: #dbeafe;
@@ -389,20 +389,28 @@ input, select, textarea, button { font-family: var(--font); }
 
     .send-grid { grid-template-columns: 1fr; }
 
+    /* Field editor - stacked layout on mobile */
     .editor { flex-direction: column; }
     .editor-sidebar { width: 100%; max-height: 180px; border-left: none; border-top: 1px solid var(--border); order: 3; }
-    .editor-tools { width: 100%; border-right: none; border-bottom: 1px solid var(--border); order: -1; }
+    .editor-tools { width: 100%; border-right: none; border-bottom: 1px solid var(--border); order: -1; max-height: none; }
+    .tools-header { padding: 8px 12px; }
+    .tools-header select { font-size: 0.82em; padding: 6px 10px; }
     .tools-grid { grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
     .tool-btn { padding: 8px 4px; gap: 4px; font-size: 0.72em; flex-direction: column; text-align: center; }
-    .editor-canvas { padding: 10px; }
-    .doc-container { width: 100%; }
+    .tool-icon { padding: 3px 6px; font-size: 0.95em; }
+    .editor-canvas { padding: 10px; overflow: auto; -webkit-overflow-scrolling: touch; }
+    .doc-container { width: 100%; min-width: 320px; }
 
     .recipient-fields { grid-template-columns: 1fr; }
     .recipient-card { padding: 10px; gap: 8px; }
+    .recipients-area { padding: 16px; }
 
+    /* Signing view - stack sidebar below document */
     .sign-body { flex-direction: column; }
-    .sign-sidebar { width: 100%; border-right: none; border-top: 1px solid var(--border); }
-    .sign-doc { padding: 10px; }
+    .sign-sidebar { width: 100%; border-right: none; border-top: 1px solid var(--border); max-height: 220px; overflow-y: auto; }
+    .sign-doc { padding: 10px; overflow: auto; -webkit-overflow-scrolling: touch; }
+    .sign-header { padding: 10px 16px; }
+    .sign-header h3 { font-size: 0.88em; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .wizard-header { padding: 10px 16px; }
     .wizard-footer { padding: 10px 16px; }
@@ -414,11 +422,27 @@ input, select, textarea, button { font-family: var(--font); }
     .upload-area { padding: 20px; }
     .upload-card { padding: 16px; }
     .upload-dropzone { height: 160px; }
+    .doc-preview-img { max-height: 300px; }
 
     .btn-lg { padding: 10px 18px; }
 
     .template-card { flex-wrap: wrap; }
     .template-card .doc-actions { width: 100%; justify-content: flex-end; }
+
+    /* Signature modal */
+    .modal-card { width: 95vw; padding: 16px; }
+    .sign-canvas { height: 140px; }
+
+    /* Field label/toolbar on mobile */
+    .field-label-tag { font-size: 0.65em; top: -20px; padding: 2px 6px; }
+    .field-toolbar { bottom: -28px; padding: 2px 4px; }
+    .field-toolbar button { font-size: 0.72em; padding: 2px 4px; }
+
+    /* Toast */
+    .toast { bottom: 16px; max-width: 90vw; font-size: 0.82em; padding: 8px 18px; }
+
+    /* Send area */
+    .send-area { padding: 16px; }
 }
 
 /* Small phones */
@@ -429,5 +453,14 @@ input, select, textarea, button { font-family: var(--font); }
     .btn-sm { padding: 4px 8px; font-size: 0.78em; }
     .dashboard { padding: 12px; }
     .dashboard-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card .stat-num { font-size: 1.2em; }
+    .stat-card .stat-label { font-size: 0.72em; }
     .tools-grid { grid-template-columns: repeat(4, 1fr); }
+    .doc-card { flex-wrap: wrap; }
+    .doc-card .doc-actions { width: 100%; margin-top: 4px; flex-direction: row; justify-content: flex-end; }
+    .wizard-stepper { gap: 0; padding: 6px 8px; }
+    .step-line { max-width: 24px; }
+    .modal-card { padding: 12px; }
+    .sign-canvas { height: 120px; }
+    .editor-sidebar { max-height: 140px; }
 }

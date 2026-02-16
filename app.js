@@ -816,6 +816,13 @@ function sendDocument() {
     DM.docs.push(doc);
     save();
 
+    // Save to Firebase for cross-browser signing
+    if (typeof firebaseSaveDoc === 'function') {
+        firebaseSaveDoc(doc).then(ok => {
+            if (ok) console.log('Document saved to Firebase');
+        });
+    }
+
     // WhatsApp notifications
     const msg = document.getElementById('sendMessage')?.value || '';
     DM.recipients.forEach(r => {
@@ -882,7 +889,7 @@ function renderSignView(el) {
         </div>
         <div class="sign-body">
             <div class="sign-doc">
-                <div class="doc-container" style="width:800px;">
+                <div class="doc-container">
                     ${doc.docImage ? `<img src="${doc.docImage}" alt="">` : ''}
                     ${(doc.fields || []).map(f => {
                         const assignee = (doc.recipients || []).find(r => r.id === f.assigneeId);
@@ -932,13 +939,19 @@ function signField(docId, fieldId) {
         openSignatureCanvas(docId, fieldId);
     } else if (field.type === 'date') {
         field.signedValue = new Date().toLocaleDateString('he-IL');
-        save(); render();
+        save(); syncDocToFirebase(doc); render();
     } else if (field.type === 'checkbox') {
         field.signedValue = '✓';
-        save(); render();
+        save(); syncDocToFirebase(doc); render();
     } else {
         const val = prompt(field.label || 'הזן ערך:');
-        if (val !== null && val.trim()) { field.signedValue = val.trim(); save(); render(); }
+        if (val !== null && val.trim()) { field.signedValue = val.trim(); save(); syncDocToFirebase(doc); render(); }
+    }
+}
+
+function syncDocToFirebase(doc) {
+    if (typeof firebaseUpdateDoc === 'function') {
+        firebaseUpdateDoc(doc).catch(() => {});
     }
 }
 
@@ -981,7 +994,7 @@ function cancelSignCanvas() { const m = document.getElementById('signModal'); if
 function confirmSignCanvas(docId, fieldId) {
     const c = window._signCanvas; if (!c) return;
     const doc = DM.docs.find(d => d.id === docId);
-    if (doc) { const f = (doc.fields || []).find(x => x.id === fieldId); if (f) { f.signedValue = '✍ חתום'; save(); } }
+    if (doc) { const f = (doc.fields || []).find(x => x.id === fieldId); if (f) { f.signedValue = '✍ חתום'; save(); syncDocToFirebase(doc); } }
     cancelSignCanvas(); render();
 }
 
@@ -993,7 +1006,9 @@ function completeSign(docId) {
     if (unfilled.length > 0) { toast(`נותרו ${unfilled.length} שדות חובה`, 'error'); return; }
     // Mark all recipients as signed
     (doc.recipients || []).forEach(r => { r.signed = true; r.signedAt = new Date().toISOString(); });
+    doc.status = 'completed';
     save();
+    syncDocToFirebase(doc);
     toast('החתימה אושרה!');
     switchView('dashboard');
 }
@@ -1023,6 +1038,11 @@ if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+// Initialize Firebase
+if (typeof initSmoovFirebase === 'function') {
+    initSmoovFirebase();
+}
+
 // CSS animation for spinner
 const style = document.createElement('style');
 style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
@@ -1037,6 +1057,24 @@ function checkUrlHash() {
         if (doc) {
             openSign(docId);
             return true;
+        }
+        // Document not in localStorage - try loading from Firebase
+        if (typeof firebaseLoadDoc === 'function') {
+            firebaseLoadDoc(docId).then(remoteDoc => {
+                if (remoteDoc) {
+                    // Add to local docs so it renders
+                    DM.docs.push(remoteDoc);
+                    save();
+                    openSign(docId);
+                } else {
+                    toast('המסמך לא נמצא', 'error');
+                    render();
+                }
+            }).catch(() => {
+                toast('שגיאה בטעינת המסמך', 'error');
+                render();
+            });
+            return true; // async - will render when done
         }
     }
     return false;
