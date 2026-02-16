@@ -447,13 +447,17 @@ function removeRecipient(id) {
 }
 
 // ==================== STEP 3: FIELD EDITOR ====================
+// Zoom state
+if (!DM._zoom) DM._zoom = 1;
+
 function renderFieldEditor(el) {
     if (!DM.activeRecipientId && DM.recipients.length) DM.activeRecipientId = DM.recipients[0].id;
     const selField = DM.fields.find(f => f.id === DM.selectedFieldId);
+    const zoomPct = Math.round(DM._zoom * 100);
 
     el.innerHTML = `<div class="editor">
         <!-- Left: Props or Thumbnail -->
-        <div class="editor-sidebar">
+        <div class="editor-sidebar ${selField ? '' : 'sidebar-mini'}">
             ${selField ? renderFieldProps(selField) : `
                 <div style="padding:12px;">
                     <div style="font-size:0.72em;color:var(--text-light);margin-bottom:8px;">תצוגה מקדימה</div>
@@ -466,7 +470,14 @@ function renderFieldEditor(el) {
 
         <!-- Center: Canvas -->
         <div class="editor-canvas" onclick="deselectField(event)" id="canvasArea">
-            <div class="doc-container" id="docContainer" onclick="onCanvasClick(event)">
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="event.stopPropagation();zoomDoc(-0.15)" title="הקטן">−</button>
+                <span class="zoom-label">${zoomPct}%</span>
+                <button class="zoom-btn" onclick="event.stopPropagation();zoomDoc(0.15)" title="הגדל">+</button>
+                <button class="zoom-btn" onclick="event.stopPropagation();zoomDoc(0, true)" title="התאם" style="font-size:0.7em;padding:4px 8px;">התאם</button>
+            </div>
+            <div class="doc-container" id="docContainer" onclick="onCanvasClick(event)" style="transform:scale(${DM._zoom});transform-origin:top center;">
                 ${DM.docImage ? `<img src="${DM.docImage}" alt="doc" id="docImage" onload="onDocImageLoad()">` : '<div style="height:1130px;"></div>'}
                 <div class="fields-layer" id="fieldsLayer">
                     ${DM.fields.map(f => renderFieldOnCanvas(f)).join('')}
@@ -514,6 +525,19 @@ function renderFieldEditor(el) {
     // Set cursor based on pending field mode
     const docCont = document.getElementById('docContainer');
     if (docCont) docCont.style.cursor = DM._pendingFieldType ? 'crosshair' : 'default';
+}
+
+function zoomDoc(delta, fit) {
+    if (fit) {
+        DM._zoom = 1;
+    } else {
+        DM._zoom = Math.max(0.4, Math.min(2.5, DM._zoom + delta));
+    }
+    // Update transform without full re-render (smoother)
+    const container = document.getElementById('docContainer');
+    const label = document.querySelector('.zoom-label');
+    if (container) container.style.transform = `scale(${DM._zoom})`;
+    if (label) label.textContent = Math.round(DM._zoom * 100) + '%';
 }
 
 function toolBtn(type, label, icon) {
@@ -625,8 +649,9 @@ function onCanvasClick(e) {
     const container = document.getElementById('docContainer');
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const zoom = DM._zoom || 1;
+    const clickX = (e.clientX - rect.left) / zoom;
+    const clickY = (e.clientY - rect.top) / zoom;
 
     const type = DM._pendingFieldType;
     const label = DM._pendingFieldLabel;
@@ -689,10 +714,11 @@ function fieldMouseDown(e, id) {
     const container = document.getElementById('docContainer');
     if (!container) return;
     const rect = container.getBoundingClientRect();
+    const zoom = DM._zoom || 1;
     const f = DM.fields.find(x => x.id === id);
     if (!f) return;
     DM.dragItem = f;
-    DM.dragOffset = { x: e.clientX - (rect.left + f.x), y: e.clientY - (rect.top + f.y) };
+    DM.dragOffset = { x: (e.clientX - rect.left) / zoom - f.x, y: (e.clientY - rect.top) / zoom - f.y };
     DM.isDragging = true;
     DM.selectedFieldId = id;
 }
@@ -719,8 +745,9 @@ function handleMouseMove(e) {
     const rect = container.getBoundingClientRect();
 
     if (DM.isResizing && DM.dragItem) {
-        const dx = e.clientX - DM.resizeStart.x;
-        const dy = e.clientY - DM.resizeStart.y;
+        const zoom = DM._zoom || 1;
+        const dx = (e.clientX - DM.resizeStart.x) / zoom;
+        const dy = (e.clientY - DM.resizeStart.y) / zoom;
         let w = DM.resizeStart.w, h = DM.resizeStart.h, x = DM.resizeStart.fx, y = DM.resizeStart.fy;
         const hdl = DM.resizeHandle;
         if (hdl.includes('e')) w += dx;
@@ -732,8 +759,9 @@ function handleMouseMove(e) {
         if (f) { f.w = w; f.h = h; f.x = x; f.y = y; }
         rerenderDragField();
     } else if (DM.isDragging && DM.dragItem) {
-        const nx = Math.max(0, Math.min(e.clientX - rect.left - DM.dragOffset.x, rect.width - 20));
-        const ny = Math.max(0, Math.min(e.clientY - rect.top - DM.dragOffset.y, rect.height - 20));
+        const zoom = DM._zoom || 1;
+        const nx = Math.max(0, Math.min((e.clientX - rect.left) / zoom - DM.dragOffset.x, rect.width / zoom - 20));
+        const ny = Math.max(0, Math.min((e.clientY - rect.top) / zoom - DM.dragOffset.y, rect.height / zoom - 20));
         const f = DM.fields.find(fld => fld.id === DM.dragItem.id);
         if (f) { f.x = nx; f.y = ny; }
         rerenderDragField();

@@ -229,15 +229,16 @@ input, select, textarea, button { font-family: var(--font); }
 /* ==================== Step 3: Field Editor ==================== */
 .editor { display: flex; height: 100%; overflow: hidden; }
 .editor-sidebar {
-    width: 250px; background: var(--card); border-left: 1px solid var(--border);
+    width: 220px; background: var(--card); border-left: 1px solid var(--border);
     display: flex; flex-direction: column; overflow-y: auto;
 }
+.editor-sidebar.sidebar-mini { width: 180px; }
 .editor-canvas {
-    flex: 1; overflow: auto; background: #e2e8f0; padding: 20px;
-    display: flex; justify-content: center; align-items: flex-start;
+    flex: 1; overflow: auto; background: #e2e8f0; padding: 16px;
+    display: flex; flex-direction: column; align-items: center;
 }
 .editor-tools {
-    width: 260px; background: var(--card); border-right: 1px solid var(--border);
+    width: 220px; background: var(--card); border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
 }
 .tools-header { padding: 14px; border-bottom: 1px solid var(--border); }
@@ -250,6 +251,22 @@ input, select, textarea, button { font-family: var(--font); }
 }
 .tool-btn:hover { background: #bfdbfe; transform: translateY(-1px); }
 .tool-icon { background: white; padding: 4px 8px; border-radius: 6px; box-shadow: var(--shadow); }
+
+/* Zoom controls */
+.zoom-controls {
+    position: sticky; top: 8px; z-index: 50; display: flex; align-items: center;
+    gap: 4px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px 8px; box-shadow: var(--shadow-md);
+    margin-bottom: 12px; width: fit-content; align-self: center;
+}
+.zoom-btn {
+    width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--card); cursor: pointer; font-size: 1.1em; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); transition: all 0.15s; font-family: var(--font);
+}
+.zoom-btn:hover { background: var(--bg); border-color: var(--primary); color: var(--primary); }
+.zoom-label { font-size: 0.78em; font-weight: 700; color: var(--text-light); min-width: 40px; text-align: center; }
 
 /* Document on canvas */
 .doc-container {
@@ -398,8 +415,11 @@ input, select, textarea, button { font-family: var(--font); }
     .tools-grid { grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
     .tool-btn { padding: 8px 4px; gap: 4px; font-size: 0.72em; flex-direction: column; text-align: center; }
     .tool-icon { padding: 3px 6px; font-size: 0.95em; }
-    .editor-canvas { padding: 10px; overflow: auto; -webkit-overflow-scrolling: touch; }
+    .editor-canvas { padding: 8px; overflow: auto; -webkit-overflow-scrolling: touch; }
     .doc-container { width: 100%; min-width: 320px; }
+    .zoom-controls { margin-bottom: 8px; padding: 3px 6px; }
+    .zoom-btn { width: 28px; height: 28px; font-size: 1em; }
+    .zoom-label { font-size: 0.72em; min-width: 34px; }
 
     .recipient-fields { grid-template-columns: 1fr; }
     .recipient-card { padding: 10px; gap: 8px; }
