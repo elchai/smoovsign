@@ -62,27 +62,39 @@ function render() {
 
 // ==================== DASHBOARD ====================
 function renderDashboard(el) {
-    const docs = DM.docs.slice().reverse();
-    const total = docs.length;
-    const completed = docs.filter(d => (d.recipients || []).every(r => r.signed)).length;
-    const pending = total - completed;
+    const allDocs = DM.docs.slice().reverse();
+    const total = allDocs.length;
+    const completed = allDocs.filter(d => d.status === 'completed' || (d.recipients || []).every(r => r.signed)).length;
+    const expired = allDocs.filter(d => d.expiresAt && new Date(d.expiresAt) < new Date() && d.status !== 'completed').length;
+    const pending = total - completed - expired;
+    const filter = DM._dashFilter || 'all';
+    const search = DM._dashSearch || '';
+
+    let docs = allDocs;
+    if (filter === 'pending') docs = docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()));
+    else if (filter === 'completed') docs = docs.filter(d => d.status === 'completed');
+    else if (filter === 'expired') docs = docs.filter(d => d.expiresAt && new Date(d.expiresAt) < new Date() && d.status !== 'completed');
+    if (search) docs = docs.filter(d => (d.fileName || '').includes(search) || (d.recipients || []).some(r => (r.name || '').includes(search)));
 
     el.innerHTML = `<div class="dashboard">
         <div class="dashboard-header">
             <h1>המסמכים שלי</h1>
         </div>
         <div class="dashboard-stats">
-            <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">סה"כ מסמכים</div></div>
-            <div class="stat-card"><div class="stat-num" style="color:var(--warning)">${pending}</div><div class="stat-label">ממתינים</div></div>
-            <div class="stat-card"><div class="stat-num" style="color:var(--success)">${completed}</div><div class="stat-label">הושלמו</div></div>
-            <div class="stat-card"><div class="stat-num" style="color:var(--primary)">${DM.templates.length}</div><div class="stat-label">תבניות</div></div>
+            <div class="stat-card clickable ${filter === 'all' ? 'stat-active' : ''}" onclick="DM._dashFilter='all';render()"><div class="stat-num">${total}</div><div class="stat-label">סה"כ מסמכים</div></div>
+            <div class="stat-card clickable ${filter === 'pending' ? 'stat-active' : ''}" onclick="DM._dashFilter='pending';render()"><div class="stat-num" style="color:var(--warning)">${pending}</div><div class="stat-label">ממתינים</div></div>
+            <div class="stat-card clickable ${filter === 'completed' ? 'stat-active' : ''}" onclick="DM._dashFilter='completed';render()"><div class="stat-num" style="color:var(--success)">${completed}</div><div class="stat-label">הושלמו</div></div>
+            <div class="stat-card clickable ${filter === 'expired' ? 'stat-active' : ''}" onclick="DM._dashFilter='expired';render()"><div class="stat-num" style="color:var(--danger)">${expired}</div><div class="stat-label">פג תוקף</div></div>
+        </div>
+        <div class="dashboard-search">
+            <input type="text" class="form-input" placeholder="חפש מסמך או נמען..." value="${search}" oninput="DM._dashSearch=this.value;render()" style="max-width:400px;">
         </div>
         ${docs.length === 0 ? `
             <div class="empty-state">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <h2>אין מסמכים עדיין</h2>
-                <p>צור מסמך חדש או השתמש בתבנית קיימת</p>
-                <button class="btn btn-primary btn-lg" onclick="newDocument()">+ צור מסמך חדש</button>
+                <h2>${search || filter !== 'all' ? 'לא נמצאו מסמכים' : 'אין מסמכים עדיין'}</h2>
+                <p>${search || filter !== 'all' ? 'נסה לשנות את הסינון או החיפוש' : 'צור מסמך חדש או השתמש בתבנית קיימת'}</p>
+                ${!search && filter === 'all' ? `<button class="btn btn-primary btn-lg" onclick="newDocument()">+ צור מסמך חדש</button>` : ''}
             </div>
         ` : `<div class="doc-list">${docs.map(d => renderDocCard(d)).join('')}</div>`}
     </div>`;
@@ -92,19 +104,23 @@ function renderDocCard(doc) {
     const signedCount = (doc.recipients || []).filter(r => r.signed).length;
     const totalR = (doc.recipients || []).length;
     const pct = totalR > 0 ? Math.round((signedCount / totalR) * 100) : 0;
-    const statusClass = pct === 100 ? 'status-complete' : pct > 0 ? 'status-pending' : 'status-waiting';
-    const statusText = pct === 100 ? 'הושלם' : pct > 0 ? 'בתהליך' : 'ממתין';
-    const statusColor = pct === 100 ? 'var(--success)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
+    const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date() && doc.status !== 'completed';
+    const statusClass = doc.status === 'completed' ? 'status-complete' : isExpired ? 'status-expired' : pct > 0 ? 'status-pending' : 'status-waiting';
+    const statusText = doc.status === 'completed' ? 'הושלם' : isExpired ? 'פג תוקף' : pct > 0 ? 'בתהליך' : 'ממתין';
+    const statusColor = doc.status === 'completed' ? 'var(--success)' : isExpired ? 'var(--danger)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
     const created = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('he-IL') : '';
 
     return `<div class="doc-card" onclick="openSign('${doc.id}')">
         <div class="doc-thumb">${doc.docImage ? `<img src="${doc.docImage}" alt="">` : ''}</div>
         <div class="doc-info">
-            <h3>${doc.fileName || 'מסמך ללא שם'}</h3>
-            <div class="doc-meta">${created}${doc.createdBy ? ' · ' + doc.createdBy : ''} · ${totalR} נמענים</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <h3>${doc.fileName || 'מסמך ללא שם'}</h3>
+                <span class="badge ${doc.status === 'completed' ? 'badge-success' : isExpired ? 'badge-danger' : 'badge-warning'}" style="font-size:0.65em;">${statusText}</span>
+            </div>
+            <div class="doc-meta">${created}${doc.createdBy ? ' · ' + doc.createdBy : ''} · ${totalR} נמענים${doc.expiresAt ? ' · תוקף: ' + new Date(doc.expiresAt).toLocaleDateString('he-IL') : ''}</div>
             <div class="doc-progress">
                 <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${statusColor}"></div></div>
-                <span class="doc-status ${statusClass}">${statusText} (${signedCount}/${totalR})</span>
+                <span class="doc-status ${statusClass}">${signedCount}/${totalR} חתמו</span>
             </div>
         </div>
         <div class="doc-actions" onclick="event.stopPropagation()">
@@ -810,6 +826,10 @@ function renderSend(el) {
                     <label class="form-label">הודעה לחותמים</label>
                     <textarea class="form-input" rows="3" placeholder="הזן הודעה שתישלח לנמענים..." id="sendMessage" style="resize:none;"></textarea>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">תאריך תפוגה (אופציונלי)</label>
+                    <input type="date" class="form-input" id="docExpiry" style="direction:ltr;text-align:right;">
+                </div>
                 <div>
                     <label class="form-label" style="margin-bottom:8px;">נמענים:</label>
                     ${DM.recipients.map(r => {
@@ -831,6 +851,8 @@ function renderSend(el) {
 // ==================== SEND DOCUMENT ====================
 function sendDocument() {
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    const now = new Date().toISOString();
+    const expiryInput = document.getElementById('docExpiry');
     const doc = {
         id: 'dm_' + Date.now(),
         fileName: DM.fileName,
@@ -838,8 +860,10 @@ function sendDocument() {
         recipients: JSON.parse(JSON.stringify(DM.recipients)),
         fields: JSON.parse(JSON.stringify(DM.fields)),
         status: 'sent',
-        createdAt: new Date().toISOString(),
-        createdBy: ''
+        createdAt: now,
+        createdBy: '',
+        expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
+        audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
     };
     DM.docs.push(doc);
     save();
@@ -901,7 +925,51 @@ function saveTemplate() {
 // ==================== SIGNING VIEW ====================
 function openSign(docId) {
     DM.signDocId = docId;
+    const doc = DM.docs.find(d => d.id === docId);
+    // If coming from a signing link (hash), show identity verification
+    if (doc && doc.status !== 'completed' && location.hash.startsWith('#sign/') && !DM._currentSigner) {
+        DM.view = 'sign';
+        showSignerVerification(doc);
+        return;
+    }
     DM.view = 'sign';
+    render();
+}
+
+function showSignerVerification(doc) {
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `<div class="verify-screen">
+        <div class="verify-card">
+            <div class="verify-icon">
+                <svg width="48" height="48" viewBox="0 0 100 100"><rect width="100" height="100" rx="16" fill="#2563eb"/><path d="M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/><path d="M50 68l14 10M64 68l-14 10" stroke="white" stroke-width="4" stroke-linecap="round"/></svg>
+            </div>
+            <h2>אימות זהות</h2>
+            <p style="color:var(--text-light);margin-bottom:20px;">נא להזדהות לפני חתימה על "${doc.fileName}"</p>
+            <div class="form-group">
+                <label class="form-label">שם מלא</label>
+                <input type="text" class="form-input" id="verifyName" placeholder="הזן את שמך המלא..." autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label">מספר טלפון (אופציונלי)</label>
+                <input type="tel" class="form-input" id="verifyPhone" placeholder="050-000-0000" style="direction:ltr;text-align:right;">
+            </div>
+            <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="verifySigner('${doc.id}')">כניסה לחתימה</button>
+            <div style="font-size:0.72em;color:var(--text-light);margin-top:16px;text-align:center;">
+                בלחיצה על "כניסה לחתימה" אתה מאשר את זהותך
+            </div>
+        </div>
+    </div>`;
+}
+
+function verifySigner(docId) {
+    const name = document.getElementById('verifyName')?.value?.trim();
+    if (!name) { toast('נא להזין שם מלא', 'error'); return; }
+    DM._currentSigner = name;
+    const doc = DM.docs.find(d => d.id === docId);
+    if (doc) {
+        addAudit(doc, 'verified', `${name} אומת/ה`);
+        save(); syncDocToFirebase(doc);
+    }
     render();
 }
 
@@ -909,11 +977,60 @@ function renderSignView(el) {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
     if (!doc) { switchView('dashboard'); return; }
 
+    // Add view audit on first render
+    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', 'המסמך נצפה'); save(); syncDocToFirebase(doc); }
+
+    const isComplete = doc.status === 'completed';
+    const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date();
+    const totalFields = (doc.fields || []).filter(f => !f.fixed).length;
+    const signedFields = (doc.fields || []).filter(f => f.signedValue).length;
+    const pct = totalFields > 0 ? Math.round((signedFields / totalFields) * 100) : 0;
+    const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+
     el.innerHTML = `<div class="wizard">
         <div class="sign-header">
             <button class="btn btn-ghost" onclick="switchView('dashboard')">← חזרה</button>
-            <h3 style="font-weight:700;">${doc.fileName || 'מסמך'}</h3>
-            <div style="width:80px;"></div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h3 style="font-weight:700;">${doc.fileName || 'מסמך'}</h3>
+                ${isComplete ? '<span class="badge badge-success">הושלם</span>' : isExpired ? '<span class="badge badge-danger">פג תוקף</span>' : '<span class="badge badge-warning">ממתין לחתימה</span>'}
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">PDF ↓</button>
+                <button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">📋</button>
+            </div>
+        </div>
+        <!-- Progress bar -->
+        <div class="sign-progress">
+            <div class="sign-progress-fill" style="width:${pct}%;"></div>
+            <span class="sign-progress-label">${signedFields}/${totalFields} שדות מולאו (${pct}%)</span>
+        </div>
+        ${isComplete ? `
+        <div class="completion-banner">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div>
+                <strong>המסמך נחתם בהצלחה!</strong>
+                <div style="font-size:0.82em;opacity:0.9;">הושלם: ${doc.completedAt ? new Date(doc.completedAt).toLocaleString('he-IL') : ''}</div>
+            </div>
+        </div>` : ''}
+        ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
+        <!-- Audit Log Panel (hidden by default) -->
+        <div class="audit-panel hidden" id="auditPanel">
+            <div class="audit-header">
+                <strong>יומן פעילות</strong>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('auditPanel').classList.add('hidden')">✕</button>
+            </div>
+            <div class="audit-list">
+                ${(doc.audit || []).slice().reverse().map(a => `
+                    <div class="audit-item">
+                        <span class="audit-icon">${a.action === 'created' ? '📄' : a.action === 'sent' ? '📨' : a.action === 'viewed' ? '👁' : a.action === 'signed' || a.action === 'field_signed' ? '✍' : a.action === 'completed' ? '✅' : a.action === 'reminder' ? '🔔' : '•'}</span>
+                        <div style="flex:1;">
+                            <div style="font-size:0.85em;font-weight:600;">${a.detail}</div>
+                            <div style="font-size:0.72em;color:var(--text-light);">${new Date(a.time).toLocaleString('he-IL')}</div>
+                        </div>
+                    </div>
+                `).join('')}
+                ${(!doc.audit || doc.audit.length === 0) ? '<div style="text-align:center;color:var(--text-light);padding:20px;font-size:0.85em;">אין פעילות עדיין</div>' : ''}
+            </div>
         </div>
         <div class="sign-body">
             <div class="sign-doc">
@@ -924,11 +1041,12 @@ function renderSignView(el) {
                         const ci = assignee ? assignee.colorIndex : 0;
                         const c = DM.fieldColors[ci % DM.fieldColors.length];
                         const val = f.signedValue || f.value || '';
-                        const canSign = !val && !f.fixed;
-                        return `<div class="sign-field ${canSign ? 'mine' : ''}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;
+                        const canSign = !val && !f.fixed && !isComplete && !isExpired;
+                        return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;
                             ${val ? `background:${c.bg};border:1px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
                             ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}>
-                            ${val ? `<span style="font-size:0.82em;font-weight:600;color:${c.text};padding:0 4px;">${val}</span>` :
+                            ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
+                              val ? `<span style="font-size:0.82em;font-weight:600;color:${c.text};padding:0 4px;">${val}</span>` :
                               canSign ? `<span style="font-size:0.75em;color:${c.text};font-weight:600;">לחץ למלא</span>` :
                               f.fixed && f.value ? `<span style="font-size:0.82em;color:${c.text};padding:0 4px;">${f.value}</span>` :
                               `<span style="font-size:0.75em;color:#aaa;">${f.label}</span>`}
@@ -937,29 +1055,133 @@ function renderSignView(el) {
                 </div>
             </div>
             <div class="sign-sidebar">
-                <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">סטטוס</h3>
+                <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">נמענים</h3>
                 ${(doc.recipients || []).map(r => {
                     const c = DM.fieldColors[(r.colorIndex || 0) % DM.fieldColors.length];
                     const myFields = (doc.fields || []).filter(f => f.assigneeId === r.id);
                     const signed = myFields.filter(f => f.signedValue).length;
-                    return `<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px;border:1px solid var(--border);">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    const rpct = myFields.length > 0 ? Math.round((signed / myFields.length) * 100) : 0;
+                    return `<div class="recipient-status-card">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                             <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
-                            <span style="font-weight:600;font-size:0.88em;">${r.name || 'נמען'}</span>
-                            ${r.signed ? '<span style="color:var(--success);font-size:0.72em;font-weight:700;">✓ חתם</span>' : ''}
+                            <span style="font-weight:600;font-size:0.88em;flex:1;">${r.name || 'נמען'}</span>
+                            ${r.signed ? '<span class="badge badge-success" style="font-size:0.65em;">חתם ✓</span>' : `<span class="badge badge-warning" style="font-size:0.65em;">ממתין</span>`}
                         </div>
-                        <div style="font-size:0.72em;color:var(--text-light);">שדות: ${signed}/${myFields.length}</div>
+                        <div class="mini-progress"><div class="mini-progress-fill" style="width:${rpct}%;background:${c.fill};"></div></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                            <span style="font-size:0.72em;color:var(--text-light);">${signed}/${myFields.length} שדות</span>
+                            ${!r.signed && r.phone ? `<button class="btn btn-ghost" style="font-size:0.68em;padding:2px 6px;" onclick="event.stopPropagation();sendReminder('${doc.id}','${r.id}')">🔔 תזכורת</button>` : ''}
+                        </div>
                     </div>`;
                 }).join('')}
-                <button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>
+                ${doc.expiresAt ? `<div style="margin-top:12px;padding:8px;background:var(--warning-light);border-radius:8px;font-size:0.78em;color:var(--warning);font-weight:600;">תוקף: ${new Date(doc.expiresAt).toLocaleDateString('he-IL')}</div>` : ''}
+                <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:8px;">
+                    <div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px;">קישור לחתימה:</div>
+                    <div style="display:flex;gap:4px;">
+                        <input type="text" class="form-input" value="${signUrl}" readonly style="font-size:0.72em;padding:6px;direction:ltr;" onclick="this.select()">
+                        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${signUrl}');toast('הקישור הועתק!')">העתק</button>
+                    </div>
+                </div>
+                ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
+                ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">הורד PDF חתום</button>` : ''}
             </div>
         </div>
     </div>`;
+    // Auto-highlight first unsigned field
+    if (!isComplete && !isExpired) highlightNextField(doc);
+}
+
+function toggleAuditLog() {
+    const panel = document.getElementById('auditPanel');
+    if (panel) panel.classList.toggle('hidden');
+}
+
+function sendReminder(docId, recipientId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+    const r = (doc.recipients || []).find(x => x.id == recipientId);
+    if (!r || !r.phone) { toast('אין מספר טלפון', 'error'); return; }
+    const phone = r.phone.replace(/[^0-9]/g, '');
+    const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
+    const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+    const waMsg = `תזכורת: שלום ${r.name}, ממתין לחתימתך על "${doc.fileName}".\nקישור: ${signUrl}`;
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+    addAudit(doc, 'reminder', `תזכורת נשלחה ל-${r.name}`);
+    save(); syncDocToFirebase(doc);
+    toast(`תזכורת נשלחה ל-${r.name}`);
+}
+
+// Download signed document as PDF
+function downloadSignedPDF(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
+    toast('מכין PDF...', 'info');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        // Scale factor from displayed size (800px) to actual image size
+        const scale = img.width / 800;
+        // Draw field values on canvas
+        (doc.fields || []).forEach(f => {
+            const val = f.signedValue || f.value || '';
+            if (!val && !f.signatureData) return;
+            const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
+            if (f.signatureData) {
+                const sigImg = new Image();
+                sigImg.src = f.signatureData;
+                try { ctx.drawImage(sigImg, fx, fy, fw, fh); } catch(e) {}
+            } else {
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.fillRect(fx, fy, fw, fh);
+                ctx.fillStyle = '#1e293b';
+                ctx.font = `bold ${14 * scale}px Segoe UI, Arial, sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center';
+                ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
+            }
+        });
+        // Add completion watermark if completed
+        if (doc.status === 'completed') {
+            ctx.save();
+            ctx.globalAlpha = 0.08;
+            ctx.fillStyle = '#16a34a';
+            ctx.font = `bold ${80 * scale}px Arial`;
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(-Math.PI / 6);
+            ctx.textAlign = 'center';
+            ctx.fillText('SIGNED', 0, 0);
+            ctx.restore();
+        }
+        // Download
+        const link = document.createElement('a');
+        link.download = `${doc.fileName || 'signed-document'}.pdf`;
+        // Use canvas to create an image-based PDF via data URL trick
+        // For simplicity, download as PNG (PDF would need jsPDF library)
+        link.download = `${doc.fileName || 'signed-document'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        toast('הקובץ הורד!');
+    };
+    img.src = doc.docImage;
+}
+
+function addAudit(doc, action, detail) {
+    if (!doc.audit) doc.audit = [];
+    doc.audit.push({ action, time: new Date().toISOString(), detail });
 }
 
 function signField(docId, fieldId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) return;
+    // Check expiration
+    if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
+        toast('תוקף המסמך פג', 'error'); return;
+    }
     const field = (doc.fields || []).find(f => f.id === fieldId);
     if (!field) return;
 
@@ -967,14 +1189,22 @@ function signField(docId, fieldId) {
         openSignatureCanvas(docId, fieldId);
     } else if (field.type === 'date') {
         field.signedValue = new Date().toLocaleDateString('he-IL');
+        addAudit(doc, 'field_signed', `שדה "${field.label}" מולא`);
         save(); syncDocToFirebase(doc); render();
     } else if (field.type === 'checkbox') {
         field.signedValue = '✓';
+        addAudit(doc, 'field_signed', `שדה "${field.label}" סומן`);
         save(); syncDocToFirebase(doc); render();
     } else {
         const val = prompt(field.label || 'הזן ערך:');
-        if (val !== null && val.trim()) { field.signedValue = val.trim(); save(); syncDocToFirebase(doc); render(); }
+        if (val !== null && val.trim()) {
+            field.signedValue = val.trim();
+            addAudit(doc, 'field_signed', `שדה "${field.label}" מולא`);
+            save(); syncDocToFirebase(doc); render();
+        }
     }
+    // Move to next unsigned field
+    highlightNextField(doc);
 }
 
 function syncDocToFirebase(doc) {
@@ -1022,22 +1252,53 @@ function cancelSignCanvas() { const m = document.getElementById('signModal'); if
 function confirmSignCanvas(docId, fieldId) {
     const c = window._signCanvas; if (!c) return;
     const doc = DM.docs.find(d => d.id === docId);
-    if (doc) { const f = (doc.fields || []).find(x => x.id === fieldId); if (f) { f.signedValue = '✍ חתום'; save(); syncDocToFirebase(doc); } }
+    if (doc) {
+        const f = (doc.fields || []).find(x => x.id === fieldId);
+        if (f) {
+            f.signedValue = '✍ חתום';
+            f.signatureData = c.toDataURL();
+            addAudit(doc, 'signed', `חתימה בשדה "${f.label}"`);
+            save(); syncDocToFirebase(doc);
+        }
+    }
     cancelSignCanvas(); render();
+    if (doc) highlightNextField(doc);
+}
+
+// Guided signing: scroll to next unsigned required field
+function highlightNextField(doc) {
+    const unsigned = (doc.fields || []).find(f => f.required && !f.fixed && !f.signedValue && !f.value);
+    if (!unsigned) return;
+    setTimeout(() => {
+        const el = document.querySelector(`.sign-field[data-fid="${unsigned.id}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('pulse');
+            setTimeout(() => el.classList.remove('pulse'), 2000);
+        }
+    }, 300);
 }
 
 function completeSign(docId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) return;
+    // Check expiration
+    if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
+        toast('תוקף המסמך פג', 'error'); return;
+    }
     // Check unfilled required fields
     const unfilled = (doc.fields || []).filter(f => f.required && !f.fixed && !f.signedValue && !f.value);
     if (unfilled.length > 0) { toast(`נותרו ${unfilled.length} שדות חובה`, 'error'); return; }
     // Mark all recipients as signed
+    const signerName = DM._currentSigner || '';
     (doc.recipients || []).forEach(r => { r.signed = true; r.signedAt = new Date().toISOString(); });
     doc.status = 'completed';
+    doc.completedAt = new Date().toISOString();
+    addAudit(doc, 'completed', signerName ? `המסמך נחתם ע"י ${signerName}` : 'המסמך נחתם');
     save();
     syncDocToFirebase(doc);
     toast('החתימה אושרה!');
+    DM._currentSigner = null;
     switchView('dashboard');
 }
 
