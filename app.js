@@ -945,7 +945,9 @@ function showSignerVerification(doc) {
     main.innerHTML = `<div class="verify-screen">
         <div class="verify-card">
             <div class="verify-icon">
-                <svg width="48" height="48" viewBox="0 0 100 100"><rect width="100" height="100" rx="16" fill="#2563eb"/><path d="M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/><path d="M50 68l14 10M64 68l-14 10" stroke="white" stroke-width="4" stroke-linecap="round"/></svg>
+                <div class="login-logo-wrap" style="width:64px;height:64px;margin:0 auto;border-radius:18px;">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="1.5"/><polyline points="14 2 14 8 20 8" fill="none" stroke="white" stroke-width="1.5"/><path d="M8 15c2-3 4 1 5-1s2-4 3-1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+                </div>
             </div>
             <h2>אימות זהות</h2>
             <p style="color:var(--text-light);margin-bottom:20px;">נא להזדהות לפני חתימה על "${doc.fileName}"</p>
@@ -1054,9 +1056,9 @@ function renderSignView(el) {
             </div>
         </div>` : ''}
         <div class="sign-body">
-            <div class="sign-doc">
-                <div class="doc-container">
-                    ${doc.docImage ? `<img src="${doc.docImage}" alt="">` : ''}
+            <div class="sign-doc" id="signDocArea">
+                <div class="doc-container sign-doc-container" id="signDocContainer">
+                    ${doc.docImage ? `<img src="${doc.docImage}" alt="" onload="scaleSignDoc()">` : ''}
                     ${(doc.fields || []).map(f => {
                         const assignee = (doc.recipients || []).find(r => r.id === f.assigneeId);
                         const ci = assignee ? assignee.colorIndex : 0;
@@ -1082,23 +1084,19 @@ function renderSignView(el) {
             </div>
             <div class="sign-sidebar">
                 ${isSignerView ? `
-                    <!-- Signer view: show only own progress -->
-                    <div style="text-align:center;padding:16px 0 10px;">
-                        <div style="font-size:0.82em;color:var(--text-light);margin-bottom:6px;">שלום, ${DM._currentSigner}</div>
-                        <div style="font-size:2em;font-weight:800;color:var(--primary);">${pct}%</div>
-                        <div style="font-size:0.82em;color:var(--text-light);">${mySignedFields}/${myFields.length} שדות מולאו</div>
-                    </div>
-                    <div class="mini-progress" style="height:6px;margin:0 0 16px;"><div class="mini-progress-fill" style="width:${pct}%;background:var(--primary);"></div></div>
-                    ${myFields.filter(f => !f.signedValue).length > 0 ? `
-                        <div style="font-size:0.78em;color:var(--text-light);font-weight:600;margin-bottom:8px;">שדות למילוי:</div>
-                        ${myFields.filter(f => !f.signedValue).map(f => `
-                            <div class="sign-field-item" onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})" style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:4px;cursor:pointer;border:1px solid var(--border);font-size:0.82em;">
-                                <span style="color:var(--primary);">${f.type === 'signature' ? ICO.sign : f.type === 'date' ? ICO.calendar : f.type === 'checkbox' ? ICO.checkbox : 'T'}</span>
-                                <span style="font-weight:600;">${f.label}${f.required ? ' *' : ''}</span>
+                    <!-- Signer view: compact progress + confirm -->
+                    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+                        <div style="flex:1;">
+                            <div style="font-size:0.82em;color:var(--text-light);">שלום, ${DM._currentSigner}</div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                                <div class="mini-progress" style="flex:1;height:6px;"><div class="mini-progress-fill" style="width:${pct}%;background:var(--primary);"></div></div>
+                                <span style="font-size:0.82em;font-weight:700;color:var(--primary);">${mySignedFields}/${myFields.length}</span>
                             </div>
-                        `).join('')}
-                    ` : `<div style="text-align:center;color:var(--success);font-weight:700;padding:16px;">כל השדות מולאו!</div>`}
-                    ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
+                        </div>
+                        ${!isComplete && !isExpired && pct === 100 ? `<button class="btn btn-success btn-sm" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
+                        ${!isComplete && !isExpired && pct < 100 ? `<span style="font-size:0.75em;color:var(--warning);font-weight:600;">לחץ על השדות במסמך</span>` : ''}
+                    </div>
+                    ${isComplete ? `<div style="text-align:center;color:var(--success);font-weight:700;padding:8px;">המסמך נחתם בהצלחה!</div>` : ''}
                 ` : `
                     <!-- Sender/owner view: show all recipients -->
                     <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">נמענים (${(doc.recipients || []).filter(r => r.signed).length}/${(doc.recipients || []).length})</h3>
@@ -1145,6 +1143,29 @@ function renderSignView(el) {
         }
     }
 }
+
+// Scale the sign doc container on mobile to fit fields correctly
+function scaleSignDoc() {
+    const container = document.getElementById('signDocContainer');
+    const area = document.getElementById('signDocArea');
+    if (!container || !area) return;
+    const areaW = area.clientWidth - 20; // padding
+    const docW = 800;
+    if (areaW < docW) {
+        const scale = areaW / docW;
+        container.style.width = docW + 'px';
+        container.style.transform = `scale(${scale})`;
+        container.style.transformOrigin = 'top center';
+        container.style.marginBottom = `-${docW * (1 - scale) * (container.scrollHeight / docW)}px`;
+    } else {
+        container.style.transform = '';
+        container.style.width = '';
+        container.style.marginBottom = '';
+    }
+}
+window.addEventListener('resize', () => {
+    if (DM.view === 'sign') scaleSignDoc();
+});
 
 function highlightNextFieldById(fieldId) {
     setTimeout(() => {

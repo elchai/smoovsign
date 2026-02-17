@@ -11,13 +11,13 @@
     "dir": "rtl",
     "icons": [
         {
-            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%232563eb'/%3E%3Cpath d='M119 61c-12-7-27-9-40-4s-21 19-21 33c0 12 6 21 15 27s27 9 40 4c6-2 10-6 14-11' stroke='white' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M96 130l24 18M120 130l-24 18' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E",
+            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='192' height='192' rx='38' fill='url(%23g)'/%3E%3Cpath d='M112 32H72a16 16 0 00-16 16v96a16 16 0 0016 16h48a16 16 0 0016-16V80l-24-48z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='6'/%3E%3Cpolyline points='112 32 112 80 136 80' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M72 116c12-20 24 8 32-6s12-24 20-6' stroke='white' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E",
             "sizes": "192x192",
             "type": "image/svg+xml",
             "purpose": "any"
         },
         {
-            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%232563eb'/%3E%3Cpath d='M318 163c-31-19-71-24-107-11s-56 50-56 87c0 31 16 56 40 72s71 24 107 11c15-5 27-15 37-29' stroke='white' stroke-width='28' stroke-linecap='round' fill='none'/%3E%3Cpath d='M256 348l64 48M320 348l-64 48' stroke='white' stroke-width='16' stroke-linecap='round'/%3E%3C/svg%3E",
+            "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='96' fill='url(%23g)'/%3E%3Cpath d='M300 86H192a42 42 0 00-42 42v256a42 42 0 0042 42h128a42 42 0 0042-42V214l-62-128z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='14'/%3E%3Cpolyline points='300 86 300 214 362 214' fill='none' stroke='white' stroke-width='14'/%3E%3Cpath d='M192 310c32-52 64 20 86-16s32-64 54-16' stroke='white' stroke-width='18' stroke-linecap='round' fill='none'/%3E%3C/svg%3E",
             "sizes": "512x512",
             "type": "image/svg+xml",
             "purpose": "any maskable"
