@@ -21,7 +21,7 @@
     --radius: 10px;
     --radius-sm: 6px;
     --radius-lg: 14px;
-    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font: 'Heebo', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -502,8 +502,8 @@ input, select, textarea, button { font-family: var(--font); }
     .editor-tools { width: 100%; border-right: none; border-bottom: 1px solid var(--border); order: -1; max-height: none; }
     .tools-header { padding: 8px 12px; }
     .tools-header select { font-size: 0.82em; padding: 6px 10px; }
-    .tools-grid { grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
-    .tool-btn { padding: 8px 4px; gap: 4px; font-size: 0.72em; flex-direction: column; text-align: center; }
+    .tools-grid { grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; }
+    .tool-btn { padding: 6px 4px; gap: 3px; font-size: 0.7em; flex-direction: column; text-align: center; }
     .tool-icon { padding: 3px 6px; font-size: 0.95em; }
     .editor-canvas { padding: 8px; overflow: auto; -webkit-overflow-scrolling: touch; }
     .doc-container { width: 100%; min-width: 320px; }
@@ -517,7 +517,7 @@ input, select, textarea, button { font-family: var(--font); }
 
     /* Signing view - sidebar as compact bar on mobile */
     .sign-body { flex-direction: column; }
-    .sign-sidebar { width: 100%; border-right: none; border-top: 1px solid var(--border); max-height: 80px; overflow-y: auto; padding: 8px 16px; }
+    .sign-sidebar { width: 100%; border-right: none; border-top: 1px solid var(--border); max-height: 100px; overflow-y: auto; padding: 8px 16px; }
     .sign-doc { padding: 10px; overflow: auto; -webkit-overflow-scrolling: touch; flex: 1; }
     .sign-doc-container { width: 800px !important; }
     .sign-header { padding: 10px 16px; }
@@ -580,7 +580,7 @@ input, select, textarea, button { font-family: var(--font); }
     .dashboard-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
     .stat-card .stat-num { font-size: 1.2em; }
     .stat-card .stat-label { font-size: 0.72em; }
-    .tools-grid { grid-template-columns: repeat(4, 1fr); }
+    .tools-grid { grid-template-columns: repeat(3, 1fr); }
     .doc-card { flex-wrap: wrap; }
     .doc-card .doc-actions { width: 100%; margin-top: 4px; flex-direction: row; justify-content: flex-end; }
     .wizard-stepper { gap: 0; padding: 6px 8px; }
@@ -659,7 +659,7 @@ input, select, textarea, button { font-family: var(--font); }
 }
 
 .login-card > p {
-    color: var(--muted);
+    color: var(--text-muted);
     margin: 0 0 36px;
     font-size: 16px;
     font-weight: 400;
