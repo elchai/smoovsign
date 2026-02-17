@@ -1,4 +1,4 @@
-// ==================== SMOOV EMAIL NOTIFICATIONS (EmailJS) ====================
+// ==================== FLOWSIGN EMAIL NOTIFICATIONS (EmailJS) ====================
 // Send email notifications when documents are signed
 //
 // SETUP INSTRUCTIONS:
@@ -15,7 +15,7 @@ const SMOOV_EMAIL = {
     templateOwner: '', // ← Template ID for owner notification
     templateSigner: '', // ← Template ID for signer copy
     ownerEmail: '',  // ← Your email (document owner)
-    ownerName: 'Smoov', // ← Your name
+    ownerName: 'FlowSign', // ← Your name
 };
 
 // ==================== EMAIL TEMPLATE CONTENT ====================
@@ -34,7 +34,7 @@ const SMOOV_EMAIL = {
 //
 //   לצפייה במסמך: {{doc_link}}
 //
-//   Smoov - חתימה דיגיטלית
+//   FlowSign - חתימה דיגיטלית
 //
 // To: {{owner_email}}
 //
@@ -50,7 +50,7 @@ const SMOOV_EMAIL = {
 //
 //   לצפייה במסמך: {{doc_link}}
 //
-//   Smoov - חתימה דיגיטלית
+//   FlowSign - חתימה דיגיטלית
 //
 // To: {{signer_email}}
 
@@ -63,7 +63,7 @@ function initSmoovEmail() {
     }
     try {
         emailjs.init(SMOOV_EMAIL.publicKey);
-        console.log('Smoov EmailJS initialized');
+        console.log('FlowSign EmailJS initialized');
         return true;
     } catch (err) {
         console.warn('EmailJS init failed:', err);
