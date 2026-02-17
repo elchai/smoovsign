@@ -757,6 +757,7 @@ function editFieldInline(id) {
     if (f.type === 'date' || f.type === 'date_auto') { f.value = new Date().toLocaleDateString('he-IL'); render(); }
     else if (f.type === 'date_manual') { const v = prompt('הזן תאריך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
     else if (f.type === 'checkbox') { f.value = f.value ? '' : '✓'; render(); }
+    else if (f.type === 'file') { const v = prompt('הנחיה לחותם (סוג קובץ נדרש):', f.value || ''); if (v !== null) { f.value = v; render(); } }
     else { const v = prompt(f.label || 'הזן ערך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
 }
 
@@ -1235,7 +1236,7 @@ function toggleAuditLog() {
 function sendReminder(docId, recipientId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) return;
-    const r = (doc.recipients || []).find(x => x.id == recipientId);
+    const r = (doc.recipients || []).find(x => String(x.id) === String(recipientId));
     if (!r || !r.phone) { toast('אין מספר טלפון', 'error'); return; }
     const phone = r.phone.replace(/[^0-9]/g, '');
     const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
@@ -1652,7 +1653,7 @@ function closeMobileMenu() {
 document.addEventListener('click', e => {
     const menu = document.getElementById('mobileMenu');
     const btn = document.getElementById('mobileMenuBtn');
-    if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
+    if (menu && btn && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
         menu.classList.add('hidden');
     }
 });
