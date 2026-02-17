@@ -1,6 +1,6 @@
 // ==================== SMOOVSIGN FIREBASE CONFIGURATION ====================
 // Firebase Firestore for cross-browser document sharing
-// Documents are stored in Firestore so signing links work across devices
+// Firebase Auth for Google Sign-In
 
 const SMOOV_FIREBASE_ENABLED = true;
 
@@ -14,18 +14,29 @@ const smoovFirebaseConfig = {
 };
 
 let smoovDb = null;
+let smoovAuth = null;
 let smoovFirestoreReady = false;
+let smoovCurrentUser = null;
 
 function initSmoovFirebase() {
     if (!SMOOV_FIREBASE_ENABLED || typeof firebase === 'undefined') return false;
     try {
-        // Check if already initialized
         if (firebase.apps.length === 0) {
             firebase.initializeApp(smoovFirebaseConfig);
         }
         smoovDb = firebase.firestore();
+        smoovAuth = firebase.auth();
         smoovFirestoreReady = true;
         console.log('SmoovSign Firebase initialized');
+
+        // Listen for auth state changes
+        smoovAuth.onAuthStateChanged(user => {
+            smoovCurrentUser = user;
+            if (typeof onAuthStateChanged === 'function') {
+                onAuthStateChanged(user);
+            }
+        });
+
         return true;
     } catch (err) {
         console.warn('SmoovSign Firebase init failed:', err);
@@ -33,7 +44,52 @@ function initSmoovFirebase() {
     }
 }
 
-// Save a document to Firestore (called when sending)
+// ==================== AUTH ====================
+async function signInWithGoogle() {
+    if (!smoovAuth) {
+        toast('שגיאה באתחול Firebase', 'error');
+        return;
+    }
+    try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await smoovAuth.signInWithPopup(provider);
+    } catch (err) {
+        if (err.code === 'auth/popup-closed-by-user') return;
+        console.error('Google sign-in error:', err);
+        toast('שגיאה בהתחברות עם Google', 'error');
+    }
+}
+
+async function signOut() {
+    if (!smoovAuth) return;
+    try {
+        await smoovAuth.signOut();
+        closeUserDropdown();
+    } catch (err) {
+        console.error('Sign out error:', err);
+    }
+}
+
+function toggleUserDropdown() {
+    const dd = document.getElementById('userDropdown');
+    dd.classList.toggle('hidden');
+    if (!dd.classList.contains('hidden')) {
+        setTimeout(() => document.addEventListener('click', closeUserDropdownOnClick, { once: true }), 0);
+    }
+}
+
+function closeUserDropdownOnClick(e) {
+    const dd = document.getElementById('userDropdown');
+    if (dd && !dd.contains(e.target)) dd.classList.add('hidden');
+}
+
+function closeUserDropdown() {
+    const dd = document.getElementById('userDropdown');
+    if (dd) dd.classList.add('hidden');
+}
+
+// ==================== FIRESTORE ====================
 async function firebaseSaveDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
@@ -45,7 +101,6 @@ async function firebaseSaveDoc(doc) {
     }
 }
 
-// Load a document from Firestore by ID (for signing links)
 async function firebaseLoadDoc(docId) {
     if (!smoovFirestoreReady || !smoovDb) return null;
     try {
@@ -58,7 +113,6 @@ async function firebaseLoadDoc(docId) {
     }
 }
 
-// Update a document in Firestore (after signing a field)
 async function firebaseUpdateDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {

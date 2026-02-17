@@ -1429,16 +1429,6 @@ if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
-// Initialize Firebase
-if (typeof initSmoovFirebase === 'function') {
-    initSmoovFirebase();
-}
-
-// Initialize EmailJS
-if (typeof initSmoovEmail === 'function') {
-    initSmoovEmail();
-}
-
 // CSS animation for spinner
 const style = document.createElement('style');
 style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
@@ -1476,5 +1466,56 @@ function checkUrlHash() {
     return false;
 }
 
-if (!checkUrlHash()) render();
+// ==================== AUTH STATE ====================
+function onAuthStateChanged(user) {
+    const loginScreen = document.getElementById('loginScreen');
+    const topbar = document.querySelector('.topbar');
+    const mainContent = document.getElementById('mainContent');
+    const userMenu = document.getElementById('userMenu');
+
+    // Signing links should work without auth
+    const hash = window.location.hash;
+    const isSignLink = hash.startsWith('#sign/');
+
+    if (user) {
+        // User is logged in
+        smoovCurrentUser = user;
+        loginScreen.style.display = 'none';
+        topbar.style.display = '';
+        mainContent.style.display = '';
+
+        // Update user menu
+        const avatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const userEmail = document.getElementById('userEmail');
+        avatar.src = user.photoURL || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%232563eb"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/></svg>');
+        userName.textContent = user.displayName || 'משתמש';
+        userEmail.textContent = user.email || '';
+        userMenu.style.display = '';
+
+        if (!checkUrlHash()) render();
+    } else if (isSignLink) {
+        // Allow signing without login
+        loginScreen.style.display = 'none';
+        topbar.style.display = 'none';
+        mainContent.style.display = '';
+        userMenu.style.display = 'none';
+        checkUrlHash();
+    } else {
+        // Not logged in - show login screen
+        loginScreen.style.display = 'flex';
+        topbar.style.display = 'none';
+        mainContent.style.display = 'none';
+        userMenu.style.display = 'none';
+    }
+}
+
+// Init: hide app until auth resolves
+document.querySelector('.topbar').style.display = 'none';
+document.getElementById('mainContent').style.display = 'none';
+
+// Initialize Firebase (auth listener will handle the rest)
+if (typeof initSmoovFirebase === 'function') initSmoovFirebase();
+if (typeof initSmoovEmail === 'function') initSmoovEmail();
+
 window.addEventListener('hashchange', () => { checkUrlHash(); });
