@@ -33,6 +33,26 @@ const DM = {
     ]
 };
 
+// SVG Icons (monochrome, no emoji)
+const ICO = {
+    edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+    trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+    copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
+    bell: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
+    log: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+    download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+    doc: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    send: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+    eye: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+    pen: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
+    check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+    sign: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
+    calendar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    user: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    id: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+    checkbox: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 11 12 14 22 4"/></svg>',
+};
+
 function save() {
     localStorage.setItem('smoov_docs', JSON.stringify(DM.docs));
     localStorage.setItem('smoov_templates', JSON.stringify(DM.templates));
@@ -53,11 +73,36 @@ function switchView(view) {
 }
 
 function render() {
+    // Save scroll positions before re-render
+    const scrolls = {};
+    const canvasArea = document.getElementById('canvasArea');
+    const signDoc = document.querySelector('.sign-doc');
+    const wizardBody = document.getElementById('wizardBody');
+    if (canvasArea) scrolls.canvas = { x: canvasArea.scrollLeft, y: canvasArea.scrollTop };
+    if (signDoc) scrolls.signDoc = { x: signDoc.scrollLeft, y: signDoc.scrollTop };
+    if (wizardBody) scrolls.wizard = { y: wizardBody.scrollTop };
+
     const main = document.getElementById('mainContent');
     if (DM.view === 'dashboard') renderDashboard(main);
     else if (DM.view === 'templates') renderTemplates(main);
     else if (DM.view === 'create') renderWizard(main);
     else if (DM.view === 'sign') renderSignView(main);
+
+    // Restore scroll positions after re-render
+    requestAnimationFrame(() => {
+        if (scrolls.canvas) {
+            const el = document.getElementById('canvasArea');
+            if (el) { el.scrollLeft = scrolls.canvas.x; el.scrollTop = scrolls.canvas.y; }
+        }
+        if (scrolls.signDoc) {
+            const el = document.querySelector('.sign-doc');
+            if (el) { el.scrollLeft = scrolls.signDoc.x; el.scrollTop = scrolls.signDoc.y; }
+        }
+        if (scrolls.wizard) {
+            const el = document.getElementById('wizardBody');
+            if (el) { el.scrollTop = scrolls.wizard.y; }
+        }
+    });
 }
 
 // ==================== DASHBOARD ====================
@@ -152,7 +197,7 @@ function renderTemplates(el) {
             </div>
         ` : `<div class="doc-list">${DM.templates.map(t => `
             <div class="template-card">
-                <div class="template-icon" style="background:var(--primary-light);">📄</div>
+                <div class="template-icon" style="background:var(--primary-light);color:var(--primary);">${ICO.doc}</div>
                 <div class="doc-info">
                     <h3>${t.name || 'תבנית ללא שם'}</h3>
                     <div class="doc-meta">${t.fields ? t.fields.length + ' שדות' : ''} · ${t.fixedFields ? t.fixedFields.filter(f => f.value).length + ' שדות מוכנים' : ''}</div>
@@ -518,13 +563,13 @@ function renderFieldEditor(el) {
             </div>
             <div class="tools-grid">
                 ${toolBtn('text', 'טקסט', 'T')}
-                ${toolBtn('signature', 'חתימה', '✍')}
-                ${toolBtn('date', 'תאריך', '📅')}
+                ${toolBtn('signature', 'חתימה', ICO.sign)}
+                ${toolBtn('date', 'תאריך', ICO.calendar)}
                 ${toolBtn('number', 'מספר', '#')}
-                ${toolBtn('fullname', 'שם מלא', '👤')}
-                ${toolBtn('id_number', 'ת.ז.', '🪪')}
-                ${toolBtn('checkbox', 'סימון', '☑')}
-                ${toolBtn('stamp', 'חותמת', '✓')}
+                ${toolBtn('fullname', 'שם מלא', ICO.user)}
+                ${toolBtn('id_number', 'ת.ז.', ICO.id)}
+                ${toolBtn('checkbox', 'סימון', ICO.checkbox)}
+                ${toolBtn('stamp', 'חותמת', ICO.check)}
             </div>
         </div>
     </div>`;
@@ -625,9 +670,9 @@ function renderFieldOnCanvas(f) {
         ${selected ? `
             <div class="field-label-tag" style="background:${c.fill};">${f.label}${f.required ? ' *' : ''}</div>
             <div class="field-toolbar">
-                <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">✏️</button>
-                <button onclick="event.stopPropagation();deleteField(${f.id})" title="מחק">🗑️</button>
-                <button onclick="event.stopPropagation();duplicateField(${f.id})" title="שכפל">📋</button>
+                <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">${ICO.edit}</button>
+                <button onclick="event.stopPropagation();deleteField(${f.id})" title="מחק">${ICO.trash}</button>
+                <button onclick="event.stopPropagation();duplicateField(${f.id})" title="שכפל">${ICO.copy}</button>
             </div>
             <div class="resize-handle" style="top:-4px;left:-4px;border-color:${c.fill};cursor:nw-resize;" onmousedown="resizeMouseDown(event,${f.id},'nw')"></div>
             <div class="resize-handle" style="top:-4px;right:-4px;border-color:${c.fill};cursor:ne-resize;" onmousedown="resizeMouseDown(event,${f.id},'ne')"></div>
@@ -977,32 +1022,44 @@ function renderSignView(el) {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
     if (!doc) { switchView('dashboard'); return; }
 
+    // Determine if this is a signer view (came via link) or sender/owner view
+    const isSignerView = !!DM._currentSigner;
+    // Match signer to a recipient by name
+    let signerRecipient = null;
+    if (isSignerView) {
+        signerRecipient = (doc.recipients || []).find(r => r.name === DM._currentSigner);
+    }
+
     // Add view audit on first render
-    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', 'המסמך נצפה'); save(); syncDocToFirebase(doc); }
+    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', isSignerView ? `${DM._currentSigner} צפה במסמך` : 'המסמך נצפה'); save(); syncDocToFirebase(doc); }
 
     const isComplete = doc.status === 'completed';
     const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date();
-    const totalFields = (doc.fields || []).filter(f => !f.fixed).length;
-    const signedFields = (doc.fields || []).filter(f => f.signedValue).length;
-    const pct = totalFields > 0 ? Math.round((signedFields / totalFields) * 100) : 0;
+
+    // For signer view: only count their fields; for sender view: count all
+    const myFields = isSignerView && signerRecipient
+        ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
+        : (doc.fields || []).filter(f => !f.fixed);
+    const mySignedFields = myFields.filter(f => f.signedValue).length;
+    const pct = myFields.length > 0 ? Math.round((mySignedFields / myFields.length) * 100) : 0;
     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
 
     el.innerHTML = `<div class="wizard">
         <div class="sign-header">
-            <button class="btn btn-ghost" onclick="switchView('dashboard')">← חזרה</button>
+            <button class="btn btn-ghost" onclick="switchView('dashboard')">← ${isSignerView ? 'יציאה' : 'חזרה'}</button>
             <div style="display:flex;align-items:center;gap:10px;">
                 <h3 style="font-weight:700;">${doc.fileName || 'מסמך'}</h3>
                 ${isComplete ? '<span class="badge badge-success">הושלם</span>' : isExpired ? '<span class="badge badge-danger">פג תוקף</span>' : '<span class="badge badge-warning">ממתין לחתימה</span>'}
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">PDF ↓</button>
-                <button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">📋</button>
+                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">${ICO.download} PDF</button>
+                ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">${ICO.log}</button>` : ''}
             </div>
         </div>
         <!-- Progress bar -->
         <div class="sign-progress">
             <div class="sign-progress-fill" style="width:${pct}%;"></div>
-            <span class="sign-progress-label">${signedFields}/${totalFields} שדות מולאו (${pct}%)</span>
+            <span class="sign-progress-label">${isSignerView ? `${mySignedFields}/${myFields.length} שדות מולאו (${pct}%)` : `${mySignedFields}/${myFields.length} שדות מולאו (${pct}%)`}</span>
         </div>
         ${isComplete ? `
         <div class="completion-banner">
@@ -1013,7 +1070,7 @@ function renderSignView(el) {
             </div>
         </div>` : ''}
         ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
-        <!-- Audit Log Panel (hidden by default) -->
+        ${!isSignerView ? `<!-- Audit Log Panel (hidden by default) -->
         <div class="audit-panel hidden" id="auditPanel">
             <div class="audit-header">
                 <strong>יומן פעילות</strong>
@@ -1022,7 +1079,7 @@ function renderSignView(el) {
             <div class="audit-list">
                 ${(doc.audit || []).slice().reverse().map(a => `
                     <div class="audit-item">
-                        <span class="audit-icon">${a.action === 'created' ? '📄' : a.action === 'sent' ? '📨' : a.action === 'viewed' ? '👁' : a.action === 'signed' || a.action === 'field_signed' ? '✍' : a.action === 'completed' ? '✅' : a.action === 'reminder' ? '🔔' : '•'}</span>
+                        <span class="audit-icon">${a.action === 'created' ? ICO.doc : a.action === 'sent' ? ICO.send : a.action === 'viewed' ? ICO.eye : a.action === 'signed' || a.action === 'field_signed' ? ICO.pen : a.action === 'completed' ? ICO.check : a.action === 'reminder' ? ICO.bell : '•'}</span>
                         <div style="flex:1;">
                             <div style="font-size:0.85em;font-weight:600;">${a.detail}</div>
                             <div style="font-size:0.72em;color:var(--text-light);">${new Date(a.time).toLocaleString('he-IL')}</div>
@@ -1031,7 +1088,7 @@ function renderSignView(el) {
                 `).join('')}
                 ${(!doc.audit || doc.audit.length === 0) ? '<div style="text-align:center;color:var(--text-light);padding:20px;font-size:0.85em;">אין פעילות עדיין</div>' : ''}
             </div>
-        </div>
+        </div>` : ''}
         <div class="sign-body">
             <div class="sign-doc">
                 <div class="doc-container">
@@ -1041,7 +1098,12 @@ function renderSignView(el) {
                         const ci = assignee ? assignee.colorIndex : 0;
                         const c = DM.fieldColors[ci % DM.fieldColors.length];
                         const val = f.signedValue || f.value || '';
-                        const canSign = !val && !f.fixed && !isComplete && !isExpired;
+                        // In signer view: only allow signing own fields
+                        const isMyField = !isSignerView || !signerRecipient || f.assigneeId === signerRecipient.id;
+                        const canSign = !val && !f.fixed && !isComplete && !isExpired && isMyField;
+                        // In signer view: hide other people's unsigned empty fields
+                        const showField = isMyField || val || f.fixed;
+                        if (!showField) return '';
                         return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;
                             ${val ? `background:${c.bg};border:1px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
                             ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}>
@@ -1055,40 +1117,80 @@ function renderSignView(el) {
                 </div>
             </div>
             <div class="sign-sidebar">
-                <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">נמענים</h3>
-                ${(doc.recipients || []).map(r => {
-                    const c = DM.fieldColors[(r.colorIndex || 0) % DM.fieldColors.length];
-                    const myFields = (doc.fields || []).filter(f => f.assigneeId === r.id);
-                    const signed = myFields.filter(f => f.signedValue).length;
-                    const rpct = myFields.length > 0 ? Math.round((signed / myFields.length) * 100) : 0;
-                    return `<div class="recipient-status-card">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                            <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
-                            <span style="font-weight:600;font-size:0.88em;flex:1;">${r.name || 'נמען'}</span>
-                            ${r.signed ? '<span class="badge badge-success" style="font-size:0.65em;">חתם ✓</span>' : `<span class="badge badge-warning" style="font-size:0.65em;">ממתין</span>`}
-                        </div>
-                        <div class="mini-progress"><div class="mini-progress-fill" style="width:${rpct}%;background:${c.fill};"></div></div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-                            <span style="font-size:0.72em;color:var(--text-light);">${signed}/${myFields.length} שדות</span>
-                            ${!r.signed && r.phone ? `<button class="btn btn-ghost" style="font-size:0.68em;padding:2px 6px;" onclick="event.stopPropagation();sendReminder('${doc.id}','${r.id}')">🔔 תזכורת</button>` : ''}
-                        </div>
-                    </div>`;
-                }).join('')}
-                ${doc.expiresAt ? `<div style="margin-top:12px;padding:8px;background:var(--warning-light);border-radius:8px;font-size:0.78em;color:var(--warning);font-weight:600;">תוקף: ${new Date(doc.expiresAt).toLocaleDateString('he-IL')}</div>` : ''}
-                <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:8px;">
-                    <div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px;">קישור לחתימה:</div>
-                    <div style="display:flex;gap:4px;">
-                        <input type="text" class="form-input" value="${signUrl}" readonly style="font-size:0.72em;padding:6px;direction:ltr;" onclick="this.select()">
-                        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${signUrl}');toast('הקישור הועתק!')">העתק</button>
+                ${isSignerView ? `
+                    <!-- Signer view: show only own progress -->
+                    <div style="text-align:center;padding:16px 0 10px;">
+                        <div style="font-size:0.82em;color:var(--text-light);margin-bottom:6px;">שלום, ${DM._currentSigner}</div>
+                        <div style="font-size:2em;font-weight:800;color:var(--primary);">${pct}%</div>
+                        <div style="font-size:0.82em;color:var(--text-light);">${mySignedFields}/${myFields.length} שדות מולאו</div>
                     </div>
-                </div>
-                ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
-                ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">הורד PDF חתום</button>` : ''}
+                    <div class="mini-progress" style="height:6px;margin:0 0 16px;"><div class="mini-progress-fill" style="width:${pct}%;background:var(--primary);"></div></div>
+                    ${myFields.filter(f => !f.signedValue).length > 0 ? `
+                        <div style="font-size:0.78em;color:var(--text-light);font-weight:600;margin-bottom:8px;">שדות למילוי:</div>
+                        ${myFields.filter(f => !f.signedValue).map(f => `
+                            <div class="sign-field-item" onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})" style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:4px;cursor:pointer;border:1px solid var(--border);font-size:0.82em;">
+                                <span style="color:var(--primary);">${f.type === 'signature' ? ICO.sign : f.type === 'date' ? ICO.calendar : f.type === 'checkbox' ? ICO.checkbox : 'T'}</span>
+                                <span style="font-weight:600;">${f.label}${f.required ? ' *' : ''}</span>
+                            </div>
+                        `).join('')}
+                    ` : `<div style="text-align:center;color:var(--success);font-weight:700;padding:16px;">כל השדות מולאו!</div>`}
+                    ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
+                ` : `
+                    <!-- Sender/owner view: show all recipients -->
+                    <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">נמענים (${(doc.recipients || []).filter(r => r.signed).length}/${(doc.recipients || []).length})</h3>
+                    ${(doc.recipients || []).map(r => {
+                        const c = DM.fieldColors[(r.colorIndex || 0) % DM.fieldColors.length];
+                        const rFields = (doc.fields || []).filter(f => f.assigneeId === r.id);
+                        const signed = rFields.filter(f => f.signedValue).length;
+                        const rpct = rFields.length > 0 ? Math.round((signed / rFields.length) * 100) : 0;
+                        return `<div class="recipient-status-card">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
+                                <span style="font-weight:600;font-size:0.88em;flex:1;">${r.name || 'נמען'}</span>
+                                ${r.signed ? '<span class="badge badge-success" style="font-size:0.65em;">חתם</span>' : `<span class="badge badge-warning" style="font-size:0.65em;">ממתין</span>`}
+                            </div>
+                            <div class="mini-progress"><div class="mini-progress-fill" style="width:${rpct}%;background:${c.fill};"></div></div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                                <span style="font-size:0.72em;color:var(--text-light);">${signed}/${rFields.length} שדות</span>
+                                ${!r.signed && r.phone ? `<button class="btn btn-ghost" style="font-size:0.68em;padding:2px 6px;display:flex;align-items:center;gap:3px;" onclick="event.stopPropagation();sendReminder('${doc.id}','${r.id}')">${ICO.bell} תזכורת</button>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('')}
+                    ${doc.expiresAt ? `<div style="margin-top:12px;padding:8px;background:var(--warning-light);border-radius:8px;font-size:0.78em;color:var(--warning);font-weight:600;">תוקף: ${new Date(doc.expiresAt).toLocaleDateString('he-IL')}</div>` : ''}
+                    <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:8px;">
+                        <div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px;">קישור לחתימה:</div>
+                        <div style="display:flex;gap:4px;">
+                            <input type="text" class="form-input" value="${signUrl}" readonly style="font-size:0.72em;padding:6px;direction:ltr;" onclick="this.select()">
+                            <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${signUrl}');toast('הקישור הועתק!')">העתק</button>
+                        </div>
+                    </div>
+                    ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
+                    ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">הורד PDF חתום</button>` : ''}
+                `}
             </div>
         </div>
     </div>`;
-    // Auto-highlight first unsigned field
-    if (!isComplete && !isExpired) highlightNextField(doc);
+    // Auto-highlight first unsigned field for signer
+    if (!isComplete && !isExpired) {
+        if (isSignerView && signerRecipient) {
+            // Highlight first unsigned field of THIS signer
+            const nextField = (doc.fields || []).find(f => f.assigneeId === signerRecipient.id && f.required && !f.fixed && !f.signedValue && !f.value);
+            if (nextField) highlightNextFieldById(nextField.id);
+        } else {
+            highlightNextField(doc);
+        }
+    }
+}
+
+function highlightNextFieldById(fieldId) {
+    setTimeout(() => {
+        const el = document.querySelector(`.sign-field[data-fid="${fieldId}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('pulse');
+            setTimeout(() => el.classList.remove('pulse'), 2000);
+        }
+    }, 300);
 }
 
 function toggleAuditLog() {
@@ -1255,7 +1357,7 @@ function confirmSignCanvas(docId, fieldId) {
     if (doc) {
         const f = (doc.fields || []).find(x => x.id === fieldId);
         if (f) {
-            f.signedValue = '✍ חתום';
+            f.signedValue = 'חתום';
             f.signatureData = c.toDataURL();
             addAudit(doc, 'signed', `חתימה בשדה "${f.label}"`);
             save(); syncDocToFirebase(doc);
@@ -1267,16 +1369,15 @@ function confirmSignCanvas(docId, fieldId) {
 
 // Guided signing: scroll to next unsigned required field
 function highlightNextField(doc) {
-    const unsigned = (doc.fields || []).find(f => f.required && !f.fixed && !f.signedValue && !f.value);
+    const isSignerView = !!DM._currentSigner;
+    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name === DM._currentSigner) : null;
+    const unsigned = (doc.fields || []).find(f => {
+        if (f.fixed || f.signedValue || f.value || !f.required) return false;
+        if (isSignerView && signerRecipient && f.assigneeId !== signerRecipient.id) return false;
+        return true;
+    });
     if (!unsigned) return;
-    setTimeout(() => {
-        const el = document.querySelector(`.sign-field[data-fid="${unsigned.id}"]`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.classList.add('pulse');
-            setTimeout(() => el.classList.remove('pulse'), 2000);
-        }
-    }, 300);
+    highlightNextFieldById(unsigned.id);
 }
 
 function completeSign(docId) {
@@ -1286,20 +1387,43 @@ function completeSign(docId) {
     if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
         toast('תוקף המסמך פג', 'error'); return;
     }
-    // Check unfilled required fields
-    const unfilled = (doc.fields || []).filter(f => f.required && !f.fixed && !f.signedValue && !f.value);
-    if (unfilled.length > 0) { toast(`נותרו ${unfilled.length} שדות חובה`, 'error'); return; }
-    // Mark all recipients as signed
-    const signerName = DM._currentSigner || '';
-    (doc.recipients || []).forEach(r => { r.signed = true; r.signedAt = new Date().toISOString(); });
-    doc.status = 'completed';
-    doc.completedAt = new Date().toISOString();
-    addAudit(doc, 'completed', signerName ? `המסמך נחתם ע"י ${signerName}` : 'המסמך נחתם');
+    const isSignerView = !!DM._currentSigner;
+    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name === DM._currentSigner) : null;
+
+    if (isSignerView && signerRecipient) {
+        // Signer view: only check THIS signer's required fields
+        const myUnfilled = (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && f.required && !f.fixed && !f.signedValue && !f.value);
+        if (myUnfilled.length > 0) { toast(`נותרו ${myUnfilled.length} שדות חובה`, 'error'); return; }
+        // Mark only this recipient as signed
+        signerRecipient.signed = true;
+        signerRecipient.signedAt = new Date().toISOString();
+        addAudit(doc, 'signed', `${DM._currentSigner} חתם/ה על המסמך`);
+        // Check if ALL recipients have signed
+        const allSigned = (doc.recipients || []).every(r => r.signed);
+        if (allSigned) {
+            doc.status = 'completed';
+            doc.completedAt = new Date().toISOString();
+            addAudit(doc, 'completed', 'כל הנמענים חתמו - המסמך הושלם');
+        }
+    } else {
+        // Sender/owner view: check all required fields
+        const unfilled = (doc.fields || []).filter(f => f.required && !f.fixed && !f.signedValue && !f.value);
+        if (unfilled.length > 0) { toast(`נותרו ${unfilled.length} שדות חובה`, 'error'); return; }
+        (doc.recipients || []).forEach(r => { r.signed = true; r.signedAt = new Date().toISOString(); });
+        doc.status = 'completed';
+        doc.completedAt = new Date().toISOString();
+        addAudit(doc, 'completed', 'המסמך נחתם');
+    }
     save();
     syncDocToFirebase(doc);
     toast('החתימה אושרה!');
-    DM._currentSigner = null;
-    switchView('dashboard');
+    if (isSignerView) {
+        // Stay on the sign view to show completion
+        render();
+    } else {
+        DM._currentSigner = null;
+        switchView('dashboard');
+    }
 }
 
 // ==================== MOBILE MENU ====================
