@@ -81,6 +81,9 @@ async function emailNotifyOwner(doc, signerName, fieldsInfo) {
             owner_email: SMOOV_EMAIL.ownerEmail,
             signer_name: signerName,
             doc_name: doc.fileName || 'מסמך',
+            fields_filled: fieldsInfo ? String(fieldsInfo.filled) : '0',
+            fields_total: fieldsInfo ? String(fieldsInfo.total) : '0',
+            status: fieldsInfo && fieldsInfo.allDone ? 'הושלם' : 'בתהליך',
             time: new Date().toLocaleString('he-IL'),
             doc_link: signUrl,
         });
@@ -97,10 +100,14 @@ async function emailNotifySigner(doc, signerName, signerEmail) {
     if (!SMOOV_EMAIL.enabled || !signerEmail) return false;
     try {
         const signUrl = `https://smoovsign.com/app.html#sign/${doc.id}`;
+        const totalF = (doc.fields || []).filter(f => !f.fixed).length;
+        const signedF = (doc.fields || []).filter(f => f.signedValue).length;
         await emailjs.send(SMOOV_EMAIL.serviceId, SMOOV_EMAIL.templateSigner, {
             signer_name: signerName,
             signer_email: signerEmail,
             doc_name: doc.fileName || 'מסמך',
+            fields_filled: String(signedF),
+            fields_total: String(totalF),
             time: new Date().toLocaleString('he-IL'),
             doc_link: signUrl,
         });
