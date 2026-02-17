@@ -2,80 +2,1015 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SmoovSign - חתימה דיגיטלית</title>
-    <meta name="description" content="SmoovSign - מערכת חתימה דיגיטלית לניהול מסמכים">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmoovSign - חתימה דיגיטלית | חתמו על מסמכים אונליין</title>
+    <meta name="description" content="SmoovSign - פלטפורמת חתימה דיגיטלית חכמה. שלחו, חתמו ועקבו אחרי מסמכים בקלות. ללא נייר, ללא סורקים. התחילו בחינם.">
+    <meta name="keywords" content="חתימה דיגיטלית, חתימה אלקטרונית, SmoovSign, חתימה על מסמכים">
+    <meta property="og:title" content="SmoovSign - חתימה דיגיטלית חכמה">
+    <meta property="og:description" content="שלחו, חתמו ועקבו אחרי מסמכים בקלות. התחילו בחינם.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://smoovsign.com">
     <meta name="theme-color" content="#2563eb">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="SmoovSign">
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%232563eb'/%3E%3Cpath d='M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6' stroke='white' stroke-width='7' stroke-linecap='round' fill='none'/%3E%3Cpath d='M50 68l14 10M64 68l-14 10' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='30' fill='%232563eb'/%3E%3Cpath d='M112 58c-11-7-25-9-38-4s-20 18-20 31c0 11 5 20 14 25s25 9 38 4c5-2 9-5 13-11' stroke='white' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M90 122l25 18M115 122l-25 18' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- Firebase SDK (compat mode - no build tools needed) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <!-- EmailJS SDK for email notifications -->
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-    <script src="email-config.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --text-muted: #94a3b8;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --radius: 14px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.7;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ==================== NAV ==================== */
+        .nav {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            z-index: 1000;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+        .nav.scrolled {
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 1px 12px rgba(0,0,0,0.06);
+            padding: 10px 40px;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: white;
+            font-weight: 800;
+            font-size: 1.3rem;
+        }
+        .nav.scrolled .nav-logo { color: var(--text); }
+        .nav.scrolled .nav-logo svg rect { fill: var(--primary); }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            list-style: none;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: rgba(255,255,255,0.85);
+            font-size: 0.92rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: white; }
+        .nav.scrolled .nav-links a { color: var(--text-light); }
+        .nav.scrolled .nav-links a:hover { color: var(--text); }
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 22px;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-white {
+            background: white;
+            color: var(--primary);
+        }
+        .btn-white:hover { background: #f0f4ff; transform: translateY(-1px); }
+        .btn-outline-white {
+            background: transparent;
+            color: white;
+            border: 1.5px solid rgba(255,255,255,0.4);
+        }
+        .btn-outline-white:hover { border-color: white; background: rgba(255,255,255,0.1); }
+        .nav.scrolled .btn-white {
+            background: var(--primary);
+            color: white;
+        }
+        .nav.scrolled .btn-white:hover { background: var(--primary-dark); }
+        .nav.scrolled .btn-outline-white {
+            color: var(--primary);
+            border-color: var(--border);
+        }
+        .nav.scrolled .btn-outline-white:hover { border-color: var(--primary); background: var(--primary-light); }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(37,99,235,0.3); }
+        .btn-lg { padding: 14px 32px; font-size: 1rem; border-radius: 10px; }
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 1.5px solid var(--border);
+        }
+        .btn-outline:hover { border-color: var(--primary); background: var(--primary-light); }
+
+        .mobile-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: white;
+            padding: 4px;
+        }
+        .nav.scrolled .mobile-toggle { color: var(--text); }
+
+        /* ==================== HERO ==================== */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 45%, #7c3aed 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 40px 80px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.08) 0%, transparent 60%),
+                        radial-gradient(circle at 70% 80%, rgba(124,58,237,0.15) 0%, transparent 50%);
+        }
+        .hero-content {
+            position: relative;
+            max-width: 700px;
+            text-align: center;
+        }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 6px 18px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+        }
+        .hero h1 {
+            font-size: clamp(2.2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            color: white;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+        .hero p {
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            color: rgba(255,255,255,0.8);
+            max-width: 540px;
+            margin: 0 auto 36px;
+            line-height: 1.8;
+        }
+        .hero-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .hero-mockup {
+            position: relative;
+            margin-top: 60px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .mockup-frame {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.25);
+            overflow: hidden;
+        }
+        .mockup-bar {
+            background: #f1f5f9;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mockup-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e2e8f0;
+        }
+        .mockup-dot:first-child { background: #fca5a5; }
+        .mockup-dot:nth-child(2) { background: #fde68a; }
+        .mockup-dot:nth-child(3) { background: #86efac; }
+        .mockup-body {
+            padding: 24px;
+            min-height: 200px;
+            display: flex;
+            gap: 16px;
+        }
+        .mockup-sidebar {
+            width: 120px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .mockup-sidebar-item {
+            height: 12px;
+            border-radius: 4px;
+            background: #e2e8f0;
+        }
+        .mockup-sidebar-item:first-child { background: var(--primary-light); width: 80%; }
+        .mockup-doc {
+            flex: 1;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .mockup-line {
+            height: 8px;
+            border-radius: 3px;
+            background: #e2e8f0;
+        }
+        .mockup-line:nth-child(1) { width: 70%; }
+        .mockup-line:nth-child(2) { width: 100%; }
+        .mockup-line:nth-child(3) { width: 85%; }
+        .mockup-line:nth-child(4) { width: 60%; }
+        .mockup-field {
+            margin-top: 8px;
+            height: 32px;
+            border-radius: 6px;
+            border: 2px dashed #3b82f6;
+            background: rgba(59,130,246,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mockup-field svg { opacity: 0.5; }
+        .mockup-field-sm {
+            height: 24px;
+            width: 50%;
+            border-radius: 6px;
+            border: 2px dashed #a855f7;
+            background: rgba(168,85,247,0.06);
+        }
+
+        /* ==================== STATS ==================== */
+        .stats {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 40px;
+        }
+        .stats-grid {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            text-align: center;
+        }
+        .stat-num {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        /* ==================== SECTIONS (shared) ==================== */
+        .section {
+            padding: 80px 40px;
+        }
+        .section-alt { background: white; }
+        .section-title {
+            text-align: center;
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .section-sub {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 1.05rem;
+            max-width: 500px;
+            margin: 0 auto 48px;
+        }
+
+        /* ==================== FEATURES ==================== */
+        .features-grid {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        .feature-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            transition: all 0.25s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+        }
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            color: var(--primary);
+        }
+        .feature-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .feature-card p {
+            font-size: 0.92rem;
+            color: var(--text-light);
+            line-height: 1.7;
+        }
+
+        /* ==================== HOW IT WORKS ==================== */
+        .steps {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            position: relative;
+        }
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 36px;
+            right: 16%;
+            left: 16%;
+            height: 2px;
+            border-top: 2px dashed var(--border);
+        }
+        .step {
+            text-align: center;
+            position: relative;
+        }
+        .step-num {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 auto 16px;
+            position: relative;
+            z-index: 1;
+        }
+        .step h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .step p {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            max-width: 240px;
+            margin: 0 auto;
+        }
+
+        /* ==================== PRICING ==================== */
+        .pricing-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+        .price-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px 28px;
+            text-align: center;
+            position: relative;
+            transition: all 0.25s ease;
+        }
+        .price-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+        }
+        .price-card.featured {
+            border: 2px solid var(--primary);
+            box-shadow: var(--shadow-lg);
+            transform: scale(1.04);
+            z-index: 1;
+        }
+        .price-card.featured:hover {
+            transform: scale(1.04) translateY(-4px);
+        }
+        .price-badge {
+            position: absolute;
+            top: -13px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 4px 16px;
+            border-radius: 50px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .price-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .price-target {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .price-amount {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--text);
+            line-height: 1;
+        }
+        .price-amount span {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .price-period {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .price-features {
+            list-style: none;
+            text-align: right;
+            margin-bottom: 28px;
+        }
+        .price-features li {
+            padding: 8px 0;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .price-features li:last-child { border: none; }
+        .price-features .check {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #dcfce7;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .price-features .dash {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .price-btn {
+            width: 100%;
+        }
+
+        /* ==================== FINAL CTA ==================== */
+        .cta-section {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 45%, #7c3aed 100%);
+            padding: 80px 40px;
+            text-align: center;
+        }
+        .cta-section h2 {
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 800;
+            color: white;
+            margin-bottom: 12px;
+        }
+        .cta-section p {
+            color: rgba(255,255,255,0.8);
+            font-size: 1.05rem;
+            margin-bottom: 32px;
+        }
+
+        /* ==================== FOOTER ==================== */
+        .footer {
+            background: white;
+            border-top: 1px solid var(--border);
+            padding: 48px 40px 24px;
+        }
+        .footer-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 32px;
+        }
+        .footer-brand p {
+            font-size: 0.88rem;
+            color: var(--text-light);
+            margin-top: 12px;
+            max-width: 280px;
+        }
+        .footer-col h4 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        .footer-col a {
+            display: block;
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.88rem;
+            padding: 4px 0;
+            transition: color 0.2s;
+        }
+        .footer-col a:hover { color: var(--primary); }
+        .footer-bottom {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        /* ==================== ANIMATIONS ==================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ==================== MOBILE MENU ==================== */
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 999;
+            background: rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .mobile-menu.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .mobile-menu-content {
+            background: white;
+            width: 280px;
+            height: 100%;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        .mobile-menu.open .mobile-menu-content {
+            transform: translateX(0);
+        }
+        .mobile-menu-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+            align-self: flex-start;
+            padding: 4px;
+            margin-bottom: 16px;
+        }
+        .mobile-menu a {
+            display: block;
+            text-decoration: none;
+            color: var(--text);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .mobile-menu .btn {
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 1024px) {
+            .hero-mockup { max-width: 480px; }
+            .mockup-sidebar { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            .nav { padding: 12px 20px; }
+            .nav.scrolled { padding: 10px 20px; }
+            .nav-links { display: none; }
+            .mobile-toggle { display: block; }
+            .mobile-menu { display: block; }
+
+            .hero { padding: 100px 20px 60px; min-height: auto; }
+            .hero h1 { font-size: 2rem; }
+
+            .section { padding: 56px 20px; }
+
+            .stats { padding: 28px 20px; }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+            .stat-num { font-size: 1.5rem; }
+
+            .features-grid { grid-template-columns: 1fr; max-width: 440px; }
+
+            .steps { grid-template-columns: 1fr; gap: 32px; }
+            .steps::before { display: none; }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+                max-width: 400px;
+                margin: 0 auto;
+            }
+            .price-card.featured { transform: none; }
+            .price-card.featured:hover { transform: translateY(-4px); }
+
+            .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+        }
+
+        @media (max-width: 400px) {
+            .hero h1 { font-size: 1.7rem; }
+            .hero-buttons { flex-direction: column; width: 100%; }
+            .hero-buttons .btn { width: 100%; }
+            .stat-num { font-size: 1.3rem; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Top Navigation -->
-    <header class="topbar">
-        <div class="topbar-right">
-            <div class="logo" onclick="switchView('dashboard')" style="cursor:pointer;">
-                <svg class="logo-svg" width="32" height="32" viewBox="0 0 100 100">
-                    <rect width="100" height="100" rx="16" fill="#2563eb"/>
-                    <path d="M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/>
-                    <path d="M50 68l14 10M64 68l-14 10" stroke="white" stroke-width="4" stroke-linecap="round"/>
-                </svg>
-                <span class="logo-text">SmoovSign</span>
-            </div>
-        </div>
-        <nav class="topbar-nav" id="topNav">
-            <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard')">מסמכים</button>
-            <button class="nav-btn" data-view="templates" onclick="switchView('templates')">תבניות</button>
-        </nav>
-        <div class="topbar-left">
-            <button class="btn btn-primary btn-sm" onclick="newDocument()">+ מסמך חדש</button>
-            <button class="btn btn-outline btn-sm hide-mobile" onclick="newTemplate()">+ תבנית חדשה</button>
-            <a href="https://elchai.github.io/battalion-scheduler/" class="btn btn-ghost btn-sm hide-mobile" title="חזרה למערכת הגדוד">← מערכת הגדוד</a>
-            <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+
+    <!-- ==================== NAV ==================== -->
+    <nav class="nav" id="mainNav">
+        <a href="#" class="nav-logo">
+            <svg width="36" height="36" viewBox="0 0 100 100">
+                <rect width="100" height="100" rx="16" fill="white"/>
+                <path d="M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6" stroke="#2563eb" stroke-width="7" stroke-linecap="round" fill="none"/>
+                <path d="M50 68l14 10M64 68l-14 10" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            SmoovSign
+        </a>
+        <ul class="nav-links">
+            <li><a href="#features">תכונות</a></li>
+            <li><a href="#how">איך זה עובד</a></li>
+            <li><a href="#pricing">מחירון</a></li>
+        </ul>
+        <div class="nav-actions">
+            <a href="app.html" class="btn btn-outline-white hide-mobile">התחברות</a>
+            <a href="app.html" class="btn btn-white hide-mobile">התחל בחינם</a>
+            <button class="mobile-toggle" id="menuToggle" onclick="openMobileMenu()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
         </div>
-    </header>
+    </nav>
 
-    <!-- Mobile Menu Dropdown -->
-    <div class="mobile-menu hidden" id="mobileMenu">
-        <button class="mobile-menu-item" onclick="switchView('dashboard');closeMobileMenu()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            מסמכים
-        </button>
-        <button class="mobile-menu-item" onclick="switchView('templates');closeMobileMenu()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-            תבניות
-        </button>
-        <button class="mobile-menu-item" onclick="newTemplate();closeMobileMenu()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            תבנית חדשה
-        </button>
-        <div class="mobile-menu-divider"></div>
-        <a href="https://elchai.github.io/battalion-scheduler/" class="mobile-menu-item">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            מערכת הגדוד
-        </a>
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu" onclick="closeMobileMenu()">
+        <div class="mobile-menu-content" onclick="event.stopPropagation()">
+            <button class="mobile-menu-close" onclick="closeMobileMenu()">&times;</button>
+            <a href="#features" onclick="closeMobileMenu()">תכונות</a>
+            <a href="#how" onclick="closeMobileMenu()">איך זה עובד</a>
+            <a href="#pricing" onclick="closeMobileMenu()">מחירון</a>
+            <a href="app.html" class="btn btn-outline" style="margin-top:16px;">התחברות</a>
+            <a href="app.html" class="btn btn-primary">התחל בחינם</a>
+        </div>
     </div>
 
-    <!-- Main Content Area -->
-    <main id="mainContent"></main>
+    <!-- ==================== HERO ==================== -->
+    <section class="hero">
+        <div class="hero-content">
+            <span class="hero-badge">חתימה דיגיטלית חכמה</span>
+            <h1>חתמו על מסמכים<br>בלחיצה אחת</h1>
+            <p>שלחו, חתמו ועקבו אחרי כל מסמך בקלות.<br>בלי נייר, בלי סורקים, בלי כאב ראש.</p>
+            <div class="hero-buttons">
+                <a href="app.html" class="btn btn-white btn-lg">התחל בחינם</a>
+                <a href="#features" class="btn btn-outline-white btn-lg">גלו עוד</a>
+            </div>
+            <div class="hero-mockup reveal">
+                <div class="mockup-frame">
+                    <div class="mockup-bar">
+                        <div class="mockup-dot"></div>
+                        <div class="mockup-dot"></div>
+                        <div class="mockup-dot"></div>
+                    </div>
+                    <div class="mockup-body">
+                        <div class="mockup-sidebar">
+                            <div class="mockup-sidebar-item" style="width:60%"></div>
+                            <div class="mockup-sidebar-item"></div>
+                            <div class="mockup-sidebar-item" style="width:75%"></div>
+                            <div class="mockup-sidebar-item" style="width:50%"></div>
+                        </div>
+                        <div class="mockup-doc">
+                            <div class="mockup-line"></div>
+                            <div class="mockup-line"></div>
+                            <div class="mockup-line"></div>
+                            <div class="mockup-line"></div>
+                            <div class="mockup-field">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                            </div>
+                            <div class="mockup-field-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
-    <!-- Toast -->
-    <div id="toast" class="toast hidden"></div>
+    <!-- ==================== STATS ==================== -->
+    <section class="stats">
+        <div class="stats-grid">
+            <div class="reveal">
+                <div class="stat-num">1,000+</div>
+                <div class="stat-label">מסמכים נחתמו</div>
+            </div>
+            <div class="reveal">
+                <div class="stat-num">500+</div>
+                <div class="stat-label">משתמשים פעילים</div>
+            </div>
+            <div class="reveal">
+                <div class="stat-num">99.9%</div>
+                <div class="stat-label">זמינות שירות</div>
+            </div>
+        </div>
+    </section>
 
-    <script src="app.js"></script>
+    <!-- ==================== FEATURES ==================== -->
+    <section class="section" id="features">
+        <h2 class="section-title reveal">למה SmoovSign?</h2>
+        <p class="section-sub reveal">כל מה שצריך לחתימה דיגיטלית מקצועית - במקום אחד</p>
+        <div class="features-grid">
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <h3>ניהול מסמכים</h3>
+                <p>העלו PDF או תמונות, ארגנו בלוח בקרה נוח ועקבו אחרי סטטוס כל מסמך בזמן אמת.</p>
+            </div>
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                </div>
+                <h3>מערכת תבניות</h3>
+                <p>צרו תבניות מוכנות מראש עם שדות חתימה, תאריך ופרטים אישיים - חסכו זמן בכל שליחה.</p>
+            </div>
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                </div>
+                <h3>עורך שדות חכם</h3>
+                <p>גררו ושחררו שדות חתימה על המסמך, הגדירו שדות לכל נמען בצבע שונה.</p>
+            </div>
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <h3>ריבוי חותמים</h3>
+                <p>שלחו מסמך לחתימת מספר אנשים, כל אחד חותם בתורו עם קישור ייחודי.</p>
+            </div>
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-4V3a1 1 0 00-1-1h-2a1 1 0 00-1 1v7H6l6 8 6-8z"/><path d="M5 20h14"/></svg>
+                </div>
+                <h3>סנכרון ענן</h3>
+                <p>כל המסמכים מסונכרנים באופן מיידי - חתימות זמינות מכל מכשיר, בכל מקום.</p>
+            </div>
+            <div class="feature-card reveal">
+                <div class="feature-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                </div>
+                <h3>התראות חכמות</h3>
+                <p>הודעות אוטומטיות במייל ובוואטסאפ - תמיד תדעו מתי מישהו חתם.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== HOW IT WORKS ==================== -->
+    <section class="section section-alt" id="how">
+        <h2 class="section-title reveal">איך זה עובד?</h2>
+        <p class="section-sub reveal">שלושה שלבים פשוטים וסיימתם</p>
+        <div class="steps">
+            <div class="step reveal">
+                <div class="step-num">1</div>
+                <h3>העלו מסמך</h3>
+                <p>העלו PDF או תמונה, או בחרו תבנית מוכנה מראש.</p>
+            </div>
+            <div class="step reveal">
+                <div class="step-num">2</div>
+                <h3>הוסיפו שדות ונמענים</h3>
+                <p>סמנו היכן לחתום, הוסיפו נמענים ושלחו קישור.</p>
+            </div>
+            <div class="step reveal">
+                <div class="step-num">3</div>
+                <h3>חתימה ואישור</h3>
+                <p>החותמים מקבלים קישור, חותמים בנייד או במחשב ומקבלים אישור.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== PRICING ==================== -->
+    <section class="section" id="pricing">
+        <h2 class="section-title reveal">מחירון</h2>
+        <p class="section-sub reveal">בחרו את המסלול המתאים לכם</p>
+        <div class="pricing-grid">
+            <!-- FREE -->
+            <div class="price-card reveal">
+                <div class="price-name">חינם</div>
+                <div class="price-target">ליחידים</div>
+                <div class="price-amount">0<span>&#8362;</span></div>
+                <div class="price-period">לתמיד</div>
+                <ul class="price-features">
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>5 מסמכים בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>2 נמענים למסמך</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>תבנית אחת</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית</li>
+                    <li><span class="dash">&ndash;</span><span style="color:var(--text-muted)">התראות מייל</span></li>
+                    <li><span class="dash">&ndash;</span><span style="color:var(--text-muted)">סנכרון ענן</span></li>
+                </ul>
+                <a href="app.html" class="btn btn-outline price-btn">התחל בחינם</a>
+            </div>
+
+            <!-- BASIC (featured) -->
+            <div class="price-card featured reveal">
+                <div class="price-badge">מומלץ</div>
+                <div class="price-name">בסיסי</div>
+                <div class="price-target">לעסקים קטנים</div>
+                <div class="price-amount">49<span>&#8362;</span></div>
+                <div class="price-period">לחודש</div>
+                <ul class="price-features">
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>50 מסמכים בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>10 נמענים למסמך</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>10 תבניות</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית + טקסט</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>התראות מייל</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>סנכרון ענן</li>
+                </ul>
+                <a href="app.html" class="btn btn-primary price-btn">התחל תקופת ניסיון</a>
+            </div>
+
+            <!-- PRO -->
+            <div class="price-card reveal">
+                <div class="price-name">פרו</div>
+                <div class="price-target">לצוותים</div>
+                <div class="price-amount">99<span>&#8362;</span></div>
+                <div class="price-period">לחודש</div>
+                <ul class="price-features">
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>מסמכים ללא הגבלה</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>נמענים ללא הגבלה</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>תבניות ללא הגבלה</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית + טקסט + חותמת</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>התראות מייל + וואטסאפ</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>סנכרון ענן + גיבוי + יומן פעילות</li>
+                </ul>
+                <a href="app.html" class="btn btn-outline price-btn">התחל תקופת ניסיון</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== FINAL CTA ==================== -->
+    <section class="cta-section">
+        <h2 class="reveal">מוכנים להתחיל?</h2>
+        <p class="reveal">הצטרפו לאלפי משתמשים שכבר חותמים בקלות</p>
+        <a href="app.html" class="btn btn-white btn-lg reveal">התחל בחינם</a>
+    </section>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="#" class="nav-logo" style="color:var(--text);">
+                    <svg width="32" height="32" viewBox="0 0 100 100">
+                        <rect width="100" height="100" rx="16" fill="#2563eb"/>
+                        <path d="M62 32c-6-4-14-5-21-2s-11 10-11 17c0 6 3 11 8 14s14 5 21 2c3-1 5-3 7-6" stroke="white" stroke-width="7" stroke-linecap="round" fill="none"/>
+                        <path d="M50 68l14 10M64 68l-14 10" stroke="white" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                    SmoovSign
+                </a>
+                <p>פלטפורמת חתימה דיגיטלית חכמה לשליחה, חתימה ומעקב אחרי מסמכים.</p>
+            </div>
+            <div class="footer-col">
+                <h4>מוצר</h4>
+                <a href="#features">תכונות</a>
+                <a href="#pricing">מחירון</a>
+                <a href="app.html">התחברות</a>
+            </div>
+            <div class="footer-col">
+                <h4>חברה</h4>
+                <a href="#">אודות</a>
+                <a href="#">צור קשר</a>
+                <a href="#">תנאי שימוש</a>
+                <a href="#">מדיניות פרטיות</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 SmoovSign. כל הזכויות שמורות.
+        </div>
+    </footer>
+
+    <script>
+        // Redirect existing signing links to app
+        if (location.hash.startsWith('#sign/')) {
+            location.href = 'app.html' + location.hash;
+        }
+
+        // Navbar scroll effect
+        const nav = document.getElementById('mainNav');
+        window.addEventListener('scroll', () => {
+            nav.classList.toggle('scrolled', window.scrollY > 50);
+        });
+
+        // Mobile menu
+        function openMobileMenu() {
+            document.getElementById('mobileMenu').classList.add('open');
+        }
+        function closeMobileMenu() {
+            document.getElementById('mobileMenu').classList.remove('open');
+        }
+
+        // Scroll reveal
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
 </body>
 </html>

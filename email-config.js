@@ -75,7 +75,7 @@ function initSmoovEmail() {
 async function emailNotifyOwner(doc, signerName, fieldsInfo) {
     if (!SMOOV_EMAIL.enabled || !SMOOV_EMAIL.ownerEmail) return false;
     try {
-        const signUrl = `https://smoovsign.com/#sign/${doc.id}`;
+        const signUrl = `https://smoovsign.com/app.html#sign/${doc.id}`;
         await emailjs.send(SMOOV_EMAIL.serviceId, SMOOV_EMAIL.templateOwner, {
             owner_name: SMOOV_EMAIL.ownerName,
             owner_email: SMOOV_EMAIL.ownerEmail,
@@ -96,7 +96,7 @@ async function emailNotifyOwner(doc, signerName, fieldsInfo) {
 async function emailNotifySigner(doc, signerName, signerEmail) {
     if (!SMOOV_EMAIL.enabled || !signerEmail) return false;
     try {
-        const signUrl = `https://smoovsign.com/#sign/${doc.id}`;
+        const signUrl = `https://smoovsign.com/app.html#sign/${doc.id}`;
         await emailjs.send(SMOOV_EMAIL.serviceId, SMOOV_EMAIL.templateSigner, {
             signer_name: signerName,
             signer_email: signerEmail,
