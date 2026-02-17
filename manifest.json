@@ -1,7 +1,7 @@
 {
-    "name": "FlowSign - חתימה דיגיטלית",
-    "short_name": "FlowSign",
-    "description": "FlowSign - מערכת חתימה דיגיטלית לניהול מסמכים",
+    "name": "SmoovSign - חתימה דיגיטלית",
+    "short_name": "SmoovSign",
+    "description": "SmoovSign - מערכת חתימה דיגיטלית לניהול מסמכים",
     "start_url": "./",
     "display": "standalone",
     "background_color": "#f1f5f9",

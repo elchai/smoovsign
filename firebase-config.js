@@ -1,4 +1,4 @@
-// ==================== FLOWSIGN FIREBASE CONFIGURATION ====================
+// ==================== SMOOVSIGN FIREBASE CONFIGURATION ====================
 // Firebase Firestore for cross-browser document sharing
 // Documents are stored in Firestore so signing links work across devices
 
@@ -25,10 +25,10 @@ function initSmoovFirebase() {
         }
         smoovDb = firebase.firestore();
         smoovFirestoreReady = true;
-        console.log('FlowSign Firebase initialized');
+        console.log('SmoovSign Firebase initialized');
         return true;
     } catch (err) {
-        console.warn('FlowSign Firebase init failed:', err);
+        console.warn('SmoovSign Firebase init failed:', err);
         return false;
     }
 }

@@ -1,4 +1,4 @@
-// ==================== FlowSign - Digital Signature App ====================
+// ==================== SmoovSign - Digital Signature App ====================
 // Standalone signature system
 
 // ==================== STATE ====================
