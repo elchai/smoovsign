@@ -213,11 +213,6 @@ input, select, textarea, button { font-family: var(--font); }
     font-family: var(--font); font-size: 0.9em; margin-top: 12px; transition: all 0.15s;
 }
 .add-recipient-btn:hover { border-color: var(--primary); color: var(--primary); }
-.soldier-picker {
-    margin-top: 20px; background: var(--card); border-radius: var(--radius);
-    box-shadow: var(--shadow); border: 1px solid var(--border); padding: 16px;
-}
-.soldier-chips { display: flex; gap: 6px; flex-wrap: wrap; max-height: 160px; overflow-y: auto; margin-top: 10px; }
 .chip {
     display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px;
     border-radius: 20px; font-size: 0.78em; font-weight: 600; cursor: pointer;

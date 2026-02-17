@@ -424,10 +424,6 @@ function clearDoc() { DM.docImage = null; DM.fileName = ''; DM.fields = []; rend
 
 // ==================== STEP 2: RECIPIENTS ====================
 function renderRecipients(el) {
-    // Try to load soldiers from parent battalion-scheduler
-    const parentState = JSON.parse(localStorage.getItem('battalionState_v2') || '{}');
-    const soldiers = parentState.soldiers || [];
-
     el.innerHTML = `<div class="recipients-area">
         <h2 style="font-size:1.3em;font-weight:700;margin-bottom:16px;">הגדרת נמענים</h2>
         ${DM.recipients.map((r, i) => {
@@ -451,49 +447,12 @@ function renderRecipients(el) {
             </div>`;
         }).join('')}
         <button class="add-recipient-btn" onclick="addRecipient()">+ הוסף נמען</button>
-        ${soldiers.length > 0 ? `
-            <div class="soldier-picker">
-                <label class="form-label" style="font-size:0.88em;font-weight:700;">הוסף אנשי קשר מהמערכת</label>
-                <input type="text" class="form-input" placeholder="חפש..." value="${DM.recipientSearch}" oninput="DM.recipientSearch=this.value;renderSoldierChips()">
-                <div class="soldier-chips" id="soldierChips">
-                    ${renderSoldierChipsHTML(soldiers)}
-                </div>
-            </div>` : ''}
     </div>`;
-}
-
-function renderSoldierChipsHTML(soldiers) {
-    if (!soldiers) {
-        const parentState = JSON.parse(localStorage.getItem('battalionState_v2') || '{}');
-        soldiers = parentState.soldiers || [];
-    }
-    let filtered = soldiers;
-    if (DM.recipientSearch) filtered = filtered.filter(s => s.name.includes(DM.recipientSearch));
-    const existing = new Set(DM.recipients.filter(r => r.soldierId).map(r => r.soldierId));
-    return filtered.slice(0, 30).map(s => {
-        const added = existing.has(s.id);
-        return `<span class="chip ${added ? 'added' : ''}" onclick="${added ? '' : `addSoldierRecipient('${s.id}')`}">${added ? '✓ ' : ''}${s.name}</span>`;
-    }).join('') + (filtered.length > 30 ? `<span style="font-size:0.78em;color:var(--text-light);padding:4px;">...ועוד ${filtered.length - 30}</span>` : '');
-}
-
-function renderSoldierChips() {
-    const el = document.getElementById('soldierChips');
-    if (el) el.innerHTML = renderSoldierChipsHTML();
 }
 
 function addRecipient() {
     DM.recipients.push({ id: Date.now(), name: '', phone: '', colorIndex: DM.recipients.length % 4, type: 'other' });
     render();
-}
-
-function addSoldierRecipient(soldierId) {
-    const parentState = JSON.parse(localStorage.getItem('battalionState_v2') || '{}');
-    const sol = (parentState.soldiers || []).find(s => s.id === soldierId);
-    if (!sol) return;
-    if (DM.recipients.find(r => r.soldierId === soldierId)) { toast('נמען כבר קיים', 'error'); return; }
-    DM.recipients.push({ id: Date.now(), name: sol.name, phone: sol.phone || '', colorIndex: DM.recipients.length % 4, type: 'soldier', soldierId });
-    render();
-    toast(`${sol.name} נוסף`);
 }
 
 function updateRecipient(id, field, value) {
