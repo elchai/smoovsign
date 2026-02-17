@@ -888,6 +888,9 @@ function renderSend(el) {
 
 // ==================== SEND DOCUMENT ====================
 function sendDocument() {
+    if (DM.recipients.length === 0) { toast('יש להוסיף לפחות נמען אחד', 'error'); return; }
+    const emptyNames = DM.recipients.filter(r => !r.name || !r.name.trim());
+    if (emptyNames.length > 0) { toast('יש להזין שם לכל הנמענים', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
     const now = new Date().toISOString();
     const expiryInput = document.getElementById('docExpiry');
@@ -1041,7 +1044,7 @@ function renderSignView(el) {
     // Match signer to a recipient by name
     let signerRecipient = null;
     if (isSignerView) {
-        signerRecipient = (doc.recipients || []).find(r => r.name === DM._currentSigner);
+        signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
     }
 
     // Add view audit on first render
@@ -1521,25 +1524,54 @@ function openFilePicker(docId, fieldId) {
 function previewFileAttachment(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        window._pendingFileData = e.target.result;
-        window._pendingFileName = file.name;
-        const preview = document.getElementById('filePreviewArea');
-        const img = document.getElementById('filePreviewImg');
-        if (file.type.startsWith('image/')) {
+    // Check file size - max 2MB
+    if (file.size > 2 * 1024 * 1024) {
+        toast('הקובץ גדול מדי (מקסימום 2MB)', 'error');
+        return;
+    }
+    if (file.type.startsWith('image/')) {
+        // Compress image before storing
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const maxDim = 800;
+                let w = img.width, h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                    else { w = Math.round(w * maxDim / h); h = maxDim; }
+                }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                window._pendingFileData = canvas.toDataURL('image/jpeg', 0.7);
+                window._pendingFileName = file.name;
+                const preview = document.getElementById('filePreviewArea');
+                const previewImg = document.getElementById('filePreviewImg');
+                if (previewImg) previewImg.src = window._pendingFileData;
+                if (preview) preview.style.display = 'block';
+                const btn = document.getElementById('confirmFileBtn');
+                if (btn) btn.disabled = false;
+            };
             img.src = e.target.result;
-            preview.style.display = 'block';
-        } else {
-            preview.style.display = 'block';
-            img.src = '';
-            img.alt = file.name;
-            preview.innerHTML = `<div style="padding:16px;background:var(--bg);border-radius:8px;font-size:0.88em;font-weight:600;">${file.name}</div>`;
-        }
-        const btn = document.getElementById('confirmFileBtn');
-        if (btn) btn.disabled = false;
-    };
-    reader.readAsDataURL(file);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Non-image file - just show filename
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            window._pendingFileData = e.target.result;
+            window._pendingFileName = file.name;
+            const preview = document.getElementById('filePreviewArea');
+            if (preview) {
+                preview.style.display = 'block';
+                preview.innerHTML = `<div style="padding:16px;background:var(--bg);border-radius:8px;font-size:0.88em;font-weight:600;">${file.name}</div>`;
+            }
+            const btn = document.getElementById('confirmFileBtn');
+            if (btn) btn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
 function closeFilePicker() {
@@ -1568,7 +1600,7 @@ function confirmFilePicker(docId, fieldId) {
 // Guided signing: scroll to next unsigned required field
 function highlightNextField(doc) {
     const isSignerView = !!DM._currentSigner;
-    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name === DM._currentSigner) : null;
+    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
     const unsigned = (doc.fields || []).find(f => {
         if (f.fixed || f.signedValue || f.value || !f.required) return false;
         if (isSignerView && signerRecipient && f.assigneeId !== signerRecipient.id) return false;
@@ -1586,7 +1618,7 @@ function completeSign(docId) {
         toast('תוקף המסמך פג', 'error'); return;
     }
     const isSignerView = !!DM._currentSigner;
-    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name === DM._currentSigner) : null;
+    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
 
     if (isSignerView && signerRecipient) {
         // Signer view: only check THIS signer's required fields
