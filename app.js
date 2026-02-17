@@ -995,6 +995,10 @@ function showSignerVerification(doc) {
                 <input type="text" class="form-input" id="verifyName" placeholder="הזן את שמך המלא..." autofocus>
             </div>
             <div class="form-group">
+                <label class="form-label">אימייל (לקבלת העתק חתימה)</label>
+                <input type="email" class="form-input" id="verifyEmail" placeholder="name@email.com" style="direction:ltr;text-align:right;">
+            </div>
+            <div class="form-group">
                 <label class="form-label">מספר טלפון (אופציונלי)</label>
                 <input type="tel" class="form-input" id="verifyPhone" placeholder="050-000-0000" style="direction:ltr;text-align:right;">
             </div>
@@ -1010,6 +1014,7 @@ function verifySigner(docId) {
     const name = document.getElementById('verifyName')?.value?.trim();
     if (!name) { toast('נא להזין שם מלא', 'error'); return; }
     DM._currentSigner = name;
+    DM._currentSignerEmail = document.getElementById('verifyEmail')?.value?.trim() || '';
     const doc = DM.docs.find(d => d.id === docId);
     if (doc) {
         addAudit(doc, 'verified', `${name} אומת/ה`);
@@ -1417,11 +1422,25 @@ function completeSign(docId) {
     save();
     syncDocToFirebase(doc);
     toast('החתימה אושרה!');
+
+    // Send email notifications
+    if (typeof emailNotifyOwner === 'function') {
+        const totalF = (doc.fields || []).filter(f => !f.fixed).length;
+        const signedF = (doc.fields || []).filter(f => f.signedValue).length;
+        const allDone = doc.status === 'completed';
+        const sName = isSignerView ? DM._currentSigner : 'בעל המסמך';
+        emailNotifyOwner(doc, sName, { filled: signedF, total: totalF, allDone });
+    }
+    if (isSignerView && DM._currentSignerEmail && typeof emailNotifySigner === 'function') {
+        emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
+    }
+
     if (isSignerView) {
         // Stay on the sign view to show completion
         render();
     } else {
         DM._currentSigner = null;
+        DM._currentSignerEmail = null;
         switchView('dashboard');
     }
 }
@@ -1454,6 +1473,11 @@ if (window.pdfjsLib) {
 // Initialize Firebase
 if (typeof initSmoovFirebase === 'function') {
     initSmoovFirebase();
+}
+
+// Initialize EmailJS
+if (typeof initSmoovEmail === 'function') {
+    initSmoovEmail();
 }
 
 // CSS animation for spinner
