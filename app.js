@@ -397,22 +397,51 @@ function handleFileUpload(e) {
     if (file) processFile(file);
 }
 
-function processFile(file) {
+async function processFile(file) {
     DM.fileName = file.name.replace(/\.\w+$/, '');
     if (file.type === 'application/pdf') {
         if (!window.pdfjsLib) { toast('PDF.js לא נטען', 'error'); return; }
         const dz = document.getElementById('dropzone');
         if (dz) dz.innerHTML = '<div style="text-align:center"><div style="width:24px;height:24px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;"></div>טוען PDF...</div>';
-        file.arrayBuffer().then(buf => window.pdfjsLib.getDocument({ data: buf }).promise)
-            .then(pdf => pdf.getPage(1))
-            .then(page => {
+        try {
+            const buf = await file.arrayBuffer();
+            const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+            const numPages = pdf.numPages;
+
+            // Render all pages and combine into one tall image
+            const pageCanvases = [];
+            let totalH = 0;
+            let maxW = 0;
+            for (let i = 1; i <= numPages; i++) {
+                const page = await pdf.getPage(i);
                 const vp = page.getViewport({ scale: 2 });
-                const canvas = document.createElement('canvas');
-                canvas.width = vp.width; canvas.height = vp.height;
-                return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(() => canvas);
-            })
-            .then(canvas => { DM.docImage = canvas.toDataURL(); render(); })
-            .catch(() => { toast('שגיאה בטעינת PDF', 'error'); render(); });
+                const c = document.createElement('canvas');
+                c.width = vp.width; c.height = vp.height;
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                pageCanvases.push(c);
+                totalH += vp.height;
+                if (vp.width > maxW) maxW = vp.width;
+            }
+
+            // Combine all pages into one canvas
+            const combined = document.createElement('canvas');
+            combined.width = maxW;
+            combined.height = totalH;
+            const ctx = combined.getContext('2d');
+            let y = 0;
+            for (const c of pageCanvases) {
+                ctx.drawImage(c, 0, y);
+                y += c.height;
+            }
+
+            DM.docImage = combined.toDataURL('image/jpeg', 0.85);
+            if (numPages > 1) toast(`${numPages} דפים נטענו בהצלחה`);
+            render();
+        } catch (err) {
+            console.error('PDF load error:', err);
+            toast('שגיאה בטעינת PDF', 'error');
+            render();
+        }
     } else {
         const reader = new FileReader();
         reader.onload = ev => { DM.docImage = ev.target.result; render(); };
@@ -865,7 +894,7 @@ function sendDocument() {
         fields: JSON.parse(JSON.stringify(DM.fields)),
         status: 'sent',
         createdAt: now,
-        createdBy: '',
+        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
         expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
         audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
     };
@@ -930,12 +959,26 @@ function saveTemplate() {
 function openSign(docId) {
     DM.signDocId = docId;
     const doc = DM.docs.find(d => d.id === docId);
-    // If coming from a signing link (hash), show identity verification
-    if (doc && doc.status !== 'completed' && location.hash.startsWith('#sign/') && !DM._currentSigner) {
+    if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('dashboard'); return; }
+
+    const isSignLink = location.hash.startsWith('#sign/');
+    const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
+
+    // If owner is logged in - go directly to owner view (no verification needed)
+    if (isLoggedIn) {
+        DM._currentSigner = null;
+        DM.view = 'sign';
+        render();
+        return;
+    }
+
+    // External signer via link - show identity verification if not yet verified
+    if (isSignLink && !DM._currentSigner && doc.status !== 'completed') {
         DM.view = 'sign';
         showSignerVerification(doc);
         return;
     }
+
     DM.view = 'sign';
     render();
 }
@@ -1199,30 +1242,40 @@ function sendReminder(docId, recipientId) {
 }
 
 // Download signed document as PDF
-function downloadSignedPDF(docId) {
+async function downloadSignedPDF(docId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
-    toast('מכין PDF...', 'info');
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function() {
+    toast('מכין מסמך להורדה...', 'info');
+
+    try {
+        // Load main document image
+        const img = await loadImage(doc.docImage);
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0);
+
         // Scale factor from displayed size (800px) to actual image size
         const scale = img.width / 800;
-        // Draw field values on canvas
+
+        // Pre-load all signature images first
+        const sigFields = (doc.fields || []).filter(f => f.signatureData);
+        const sigImages = {};
+        await Promise.all(sigFields.map(async f => {
+            try {
+                sigImages[f.id] = await loadImage(f.signatureData);
+            } catch(e) { /* skip failed loads */ }
+        }));
+
+        // Draw all field values on canvas
         (doc.fields || []).forEach(f => {
             const val = f.signedValue || f.value || '';
             if (!val && !f.signatureData) return;
             const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
-            if (f.signatureData) {
-                const sigImg = new Image();
-                sigImg.src = f.signatureData;
-                try { ctx.drawImage(sigImg, fx, fy, fw, fh); } catch(e) {}
-            } else {
+            if (f.signatureData && sigImages[f.id]) {
+                ctx.drawImage(sigImages[f.id], fx, fy, fw, fh);
+            } else if (val) {
                 ctx.fillStyle = 'rgba(255,255,255,0.85)';
                 ctx.fillRect(fx, fy, fw, fh);
                 ctx.fillStyle = '#1e293b';
@@ -1232,6 +1285,7 @@ function downloadSignedPDF(docId) {
                 ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
             }
         });
+
         // Add completion watermark if completed
         if (doc.status === 'completed') {
             ctx.save();
@@ -1244,17 +1298,28 @@ function downloadSignedPDF(docId) {
             ctx.fillText('SIGNED', 0, 0);
             ctx.restore();
         }
-        // Download
+
+        // Download as PNG
         const link = document.createElement('a');
-        link.download = `${doc.fileName || 'signed-document'}.pdf`;
-        // Use canvas to create an image-based PDF via data URL trick
-        // For simplicity, download as PNG (PDF would need jsPDF library)
         link.download = `${doc.fileName || 'signed-document'}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
         toast('הקובץ הורד!');
-    };
-    img.src = doc.docImage;
+    } catch (err) {
+        console.error('Download error:', err);
+        toast('שגיאה בהורדת הקובץ', 'error');
+    }
+}
+
+// Helper: load an image and return a promise
+function loadImage(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = src;
+    });
 }
 
 function addAudit(doc, action, detail) {
