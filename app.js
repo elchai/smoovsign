@@ -26,10 +26,10 @@ const DM = {
     signDocId: null,
     recipientSearch: '',
     fieldColors: [
-        { bg: '#dbeafe', border: '#3b82f6', text: '#2563eb', fill: '#3b82f6' },
-        { bg: '#f3e8ff', border: '#a855f7', text: '#9333ea', fill: '#a855f7' },
-        { bg: '#dcfce7', border: '#22c55e', text: '#16a34a', fill: '#22c55e' },
-        { bg: '#ffedd5', border: '#f97316', text: '#ea580c', fill: '#f97316' }
+        { bg: '#dbeafe', border: '#2563eb', text: '#1d4ed8', fill: '#2563eb' },
+        { bg: '#f3e8ff', border: '#7c3aed', text: '#6d28d9', fill: '#7c3aed' },
+        { bg: '#dcfce7', border: '#16a34a', text: '#15803d', fill: '#16a34a' },
+        { bg: '#ffedd5', border: '#ea580c', text: '#c2410c', fill: '#ea580c' }
     ]
 };
 
@@ -552,12 +552,13 @@ function renderFieldEditor(el) {
             <div class="tools-grid">
                 ${toolBtn('text', 'טקסט', 'T')}
                 ${toolBtn('signature', 'חתימה', ICO.sign)}
-                ${toolBtn('date', 'תאריך', ICO.calendar)}
+                ${toolBtn('date_auto', 'תאריך אוטומטי', ICO.calendar)}
+                ${toolBtn('date_manual', 'בחירת תאריך', ICO.calendar)}
                 ${toolBtn('number', 'מספר', '#')}
                 ${toolBtn('fullname', 'שם מלא', ICO.user)}
                 ${toolBtn('id_number', 'ת.ז.', ICO.id)}
                 ${toolBtn('checkbox', 'סימון', ICO.checkbox)}
-                ${toolBtn('stamp', 'חותמת', ICO.check)}
+                ${toolBtn('file', 'צירוף קובץ', ICO.doc)}
             </div>
         </div>
     </div>`;
@@ -618,11 +619,13 @@ function renderFieldProps(f) {
                 <select class="form-input" onchange="updateField(${f.id},'type',this.value)">
                     <option value="text" ${f.type === 'text' ? 'selected' : ''}>טקסט חופשי</option>
                     <option value="signature" ${f.type === 'signature' ? 'selected' : ''}>חתימה</option>
-                    <option value="date" ${f.type === 'date' ? 'selected' : ''}>תאריך</option>
+                    <option value="date_auto" ${f.type === 'date_auto' || f.type === 'date' ? 'selected' : ''}>תאריך אוטומטי</option>
+                    <option value="date_manual" ${f.type === 'date_manual' ? 'selected' : ''}>בחירת תאריך</option>
                     <option value="number" ${f.type === 'number' ? 'selected' : ''}>מספר</option>
                     <option value="fullname" ${f.type === 'fullname' ? 'selected' : ''}>שם מלא</option>
                     <option value="id_number" ${f.type === 'id_number' ? 'selected' : ''}>תעודת זהות</option>
                     <option value="checkbox" ${f.type === 'checkbox' ? 'selected' : ''}>תיבת סימון</option>
+                    <option value="file" ${f.type === 'file' ? 'selected' : ''}>צירוף קובץ</option>
                 </select>
             </div>
             ${DM.isTemplate ? `<div class="form-group">
@@ -632,8 +635,8 @@ function renderFieldProps(f) {
                 </label>
             </div>` : ''}
             <div class="form-group">
-                <label class="form-label">${f.fixed ? 'ערך קבוע' : 'ערך ברירת מחדל'}</label>
-                <input type="text" class="form-input" value="${f.value || ''}" onchange="updateField(${f.id},'value',this.value)" placeholder="${f.fixed ? 'הזן ערך שימולא אוטומטית...' : 'מה יוצג בשדה...'}">
+                <label class="form-label">${f.type === 'file' ? 'הנחיה לחותם (סוג קובץ)' : f.fixed ? 'ערך קבוע' : 'ערך ברירת מחדל'}</label>
+                <input type="text" class="form-input" value="${f.value || ''}" onchange="updateField(${f.id},'value',this.value)" placeholder="${f.type === 'file' ? 'לדוגמה: צלם תעודת זהות...' : f.fixed ? 'הזן ערך שימולא אוטומטית...' : 'מה יוצג בשדה...'}">
             </div>
         </div>
         <div style="padding:12px;border-top:1px solid var(--border);background:var(--bg);">
@@ -648,7 +651,7 @@ function renderFieldOnCanvas(f) {
     const ci = assignee ? assignee.colorIndex : (f.fixed ? 2 : 0);
     const c = DM.fieldColors[ci % DM.fieldColors.length];
     const selected = DM.selectedFieldId === f.id;
-    const typeLabels = { signature: 'חתימה', date: 'תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓' };
+    const typeLabels = { signature: 'חתימה', date: 'תאריך', date_auto: 'תאריך אוטומטי', date_manual: 'בחירת תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓', file: 'צירוף קובץ' };
     const displayText = f.value || typeLabels[f.type] || f.label || 'טקסט';
 
     return `<div class="field-box ${selected ? 'selected' : ''}" data-fid="${f.id}"
@@ -705,8 +708,8 @@ function onCanvasClick(e) {
     const type = DM._pendingFieldType;
     const label = DM._pendingFieldLabel;
     const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
-    const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 30 : 140;
-    const defaultH = type === 'signature' ? 50 : type === 'checkbox' ? 30 : 32;
+    const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 30 : type === 'file' ? 160 : 140;
+    const defaultH = type === 'signature' ? 50 : type === 'checkbox' ? 30 : type === 'file' ? 50 : 32;
 
     // Place field centered on click position
     const f = {
@@ -751,7 +754,8 @@ function duplicateField(id) {
 function editFieldInline(id) {
     const f = DM.fields.find(x => x.id === id);
     if (!f) return;
-    if (f.type === 'date') { f.value = new Date().toLocaleDateString('he-IL'); render(); }
+    if (f.type === 'date' || f.type === 'date_auto') { f.value = new Date().toLocaleDateString('he-IL'); render(); }
+    else if (f.type === 'date_manual') { const v = prompt('הזן תאריך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
     else if (f.type === 'checkbox') { f.value = f.value ? '' : '✓'; render(); }
     else { const v = prompt(f.label || 'הזן ערך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
 }
@@ -1061,7 +1065,7 @@ function renderSignView(el) {
                 ${isComplete ? '<span class="badge badge-success">הושלם</span>' : isExpired ? '<span class="badge badge-danger">פג תוקף</span>' : '<span class="badge badge-warning">ממתין לחתימה</span>'}
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">${ICO.download} PDF</button>
+                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד קובץ">${ICO.download} הורדה</button>
                 ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">${ICO.log}</button>` : ''}
             </div>
         </div>
@@ -1114,13 +1118,15 @@ function renderSignView(el) {
                         const showField = isMyField || val || f.fixed;
                         if (!showField) return '';
                         return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;
-                            ${val ? `background:${c.bg};border:1px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
+                            ${val ? `background:${c.bg};border:1.5px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
                             ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}>
                             ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
-                              val ? `<span style="font-size:0.82em;font-weight:600;color:${c.text};padding:0 4px;">${val}</span>` :
-                              canSign ? `<span style="font-size:0.75em;color:${c.text};font-weight:600;">לחץ למלא</span>` :
-                              f.fixed && f.value ? `<span style="font-size:0.82em;color:${c.text};padding:0 4px;">${f.value}</span>` :
-                              `<span style="font-size:0.75em;color:#aaa;">${f.label}</span>`}
+                              f.fileData ? `<img src="${f.fileData}" style="width:100%;height:100%;object-fit:contain;" alt="קובץ מצורף">` :
+                              val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;">${val}</span>` :
+                              canSign && f.type === 'file' ? `<span style="font-size:0.75em;color:${c.text};font-weight:700;">📎 ${f.value || 'לחץ לצרף קובץ'}</span>` :
+                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">לחץ למלא</span>` :
+                              f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;">${f.value}</span>` :
+                              `<span style="font-size:0.75em;color:#888;font-weight:600;">${f.label}</span>`}
                         </div>`;
                     }).join('')}
                 </div>
@@ -1170,7 +1176,7 @@ function renderSignView(el) {
                         </div>
                     </div>
                     ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
-                    ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">הורד PDF חתום</button>` : ''}
+                    ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">${ICO.download} הורד קובץ חתום</button>` : ''}
                 `}
             </div>
         </div>
@@ -1268,18 +1274,28 @@ async function downloadSignedPDF(docId) {
             } catch(e) { /* skip failed loads */ }
         }));
 
-        // Draw all field values on canvas
+        // Pre-load all file attachment images
+        const fileFields = (doc.fields || []).filter(f => f.fileData);
+        const fileImages = {};
+        await Promise.all(fileFields.map(async f => {
+            try {
+                fileImages[f.id] = await loadImage(f.fileData);
+            } catch(e) { /* skip failed loads */ }
+        }));
+
+        // Draw all field values on canvas - NO colored backgrounds, clean output
         (doc.fields || []).forEach(f => {
             const val = f.signedValue || f.value || '';
-            if (!val && !f.signatureData) return;
+            if (!val && !f.signatureData && !f.fileData) return;
             const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
             if (f.signatureData && sigImages[f.id]) {
                 ctx.drawImage(sigImages[f.id], fx, fy, fw, fh);
+            } else if (f.fileData && fileImages[f.id]) {
+                ctx.drawImage(fileImages[f.id], fx, fy, fw, fh);
             } else if (val) {
-                ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                ctx.fillRect(fx, fy, fw, fh);
+                // Clean text without colored background
                 ctx.fillStyle = '#1e293b';
-                ctx.font = `bold ${14 * scale}px Segoe UI, Arial, sans-serif`;
+                ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
                 ctx.textBaseline = 'middle';
                 ctx.textAlign = 'center';
                 ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
@@ -1339,10 +1355,17 @@ function signField(docId, fieldId) {
 
     if (field.type === 'signature') {
         openSignatureCanvas(docId, fieldId);
-    } else if (field.type === 'date') {
+    } else if (field.type === 'date_auto' || field.type === 'date') {
+        // Auto date - fill with today's date
         field.signedValue = new Date().toLocaleDateString('he-IL');
         addAudit(doc, 'field_signed', `שדה "${field.label}" מולא`);
         save(); syncDocToFirebase(doc); render();
+    } else if (field.type === 'date_manual') {
+        // Manual date - show date picker
+        openDatePicker(docId, fieldId);
+    } else if (field.type === 'file') {
+        // File attachment - open file/camera picker
+        openFilePicker(docId, fieldId);
     } else if (field.type === 'checkbox') {
         field.signedValue = '✓';
         addAudit(doc, 'field_signed', `שדה "${field.label}" סומן`);
@@ -1414,6 +1437,130 @@ function confirmSignCanvas(docId, fieldId) {
         }
     }
     cancelSignCanvas(); render();
+    if (doc) highlightNextField(doc);
+}
+
+// ==================== DATE PICKER ====================
+function openDatePicker(docId, fieldId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    const field = doc ? (doc.fields || []).find(f => f.id === fieldId) : null;
+    const hint = field && field.value ? field.value : '';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'dateModal';
+    overlay.innerHTML = `<div class="modal-card">
+        <h3 style="font-weight:700;margin-bottom:12px;">בחירת תאריך</h3>
+        ${hint ? `<p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">${hint}</p>` : ''}
+        <input type="date" id="datePickerInput" class="form-input" style="font-size:1.1em;padding:12px;text-align:center;">
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="closeDatePicker()">ביטול</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmDatePicker('${docId}',${JSON.stringify(fieldId)})">אישור</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    // Set default to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('datePickerInput').value = today;
+}
+
+function closeDatePicker() {
+    const m = document.getElementById('dateModal');
+    if (m) m.remove();
+}
+
+function confirmDatePicker(docId, fieldId) {
+    const input = document.getElementById('datePickerInput');
+    if (!input || !input.value) { toast('בחר תאריך', 'error'); return; }
+    const doc = DM.docs.find(d => d.id === docId);
+    if (doc) {
+        const f = (doc.fields || []).find(x => x.id === fieldId);
+        if (f) {
+            const d = new Date(input.value);
+            f.signedValue = d.toLocaleDateString('he-IL');
+            addAudit(doc, 'field_signed', `שדה "${f.label}" מולא`);
+            save(); syncDocToFirebase(doc);
+        }
+    }
+    closeDatePicker(); render();
+    if (doc) highlightNextField(doc);
+}
+
+// ==================== FILE PICKER ====================
+function openFilePicker(docId, fieldId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    const field = doc ? (doc.fields || []).find(f => f.id === fieldId) : null;
+    const hint = field && field.value ? field.value : 'צלם או בחר קובץ תמונה';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'fileModal';
+    overlay.innerHTML = `<div class="modal-card">
+        <h3 style="font-weight:700;margin-bottom:8px;">צירוף קובץ</h3>
+        <p style="font-size:0.85em;color:var(--text-light);margin-bottom:14px;">${hint}</p>
+        <div id="filePreviewArea" style="display:none;margin-bottom:12px;text-align:center;">
+            <img id="filePreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <label class="btn btn-outline" style="flex:1;justify-content:center;cursor:pointer;">
+                <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="previewFileAttachment(this)">
+                📷 צלם תמונה
+            </label>
+            <label class="btn btn-outline" style="flex:1;justify-content:center;cursor:pointer;">
+                <input type="file" accept="image/*,.pdf" style="display:none;" onchange="previewFileAttachment(this)">
+                📁 בחר קובץ
+            </label>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="closeFilePicker()">ביטול</button>
+            <button class="btn btn-primary" style="flex:1;" id="confirmFileBtn" disabled onclick="confirmFilePicker('${docId}',${JSON.stringify(fieldId)})">אישור</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+function previewFileAttachment(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        window._pendingFileData = e.target.result;
+        window._pendingFileName = file.name;
+        const preview = document.getElementById('filePreviewArea');
+        const img = document.getElementById('filePreviewImg');
+        if (file.type.startsWith('image/')) {
+            img.src = e.target.result;
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'block';
+            img.src = '';
+            img.alt = file.name;
+            preview.innerHTML = `<div style="padding:16px;background:var(--bg);border-radius:8px;font-size:0.88em;font-weight:600;">${file.name}</div>`;
+        }
+        const btn = document.getElementById('confirmFileBtn');
+        if (btn) btn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+}
+
+function closeFilePicker() {
+    const m = document.getElementById('fileModal');
+    if (m) m.remove();
+    delete window._pendingFileData;
+    delete window._pendingFileName;
+}
+
+function confirmFilePicker(docId, fieldId) {
+    if (!window._pendingFileData) { toast('בחר קובץ', 'error'); return; }
+    const doc = DM.docs.find(d => d.id === docId);
+    if (doc) {
+        const f = (doc.fields || []).find(x => x.id === fieldId);
+        if (f) {
+            f.signedValue = window._pendingFileName || 'קובץ מצורף';
+            f.fileData = window._pendingFileData;
+            addAudit(doc, 'field_signed', `קובץ "${window._pendingFileName}" צורף לשדה "${f.label}"`);
+            save(); syncDocToFirebase(doc);
+        }
+    }
+    closeFilePicker(); render();
     if (doc) highlightNextField(doc);
 }
 
