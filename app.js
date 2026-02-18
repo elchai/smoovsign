@@ -224,6 +224,9 @@ function useTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
+    DM.docPages = tpl.docPages || [];
+    DM.pageHeights = tpl.pageHeights || [];
+    DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
     // Copy template fields - fixed ones keep their value, dynamic ones are empty
     DM.fields = (tpl.fields || []).map(f => ({
@@ -241,6 +244,9 @@ function editTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
+    DM.docPages = tpl.docPages || [];
+    DM.pageHeights = tpl.pageHeights || [];
+    DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
     DM.fields = JSON.parse(JSON.stringify(tpl.fields || []));
     DM.isTemplate = true;
@@ -410,6 +416,7 @@ async function processFile(file) {
 
             // Render all pages and combine into one tall image
             const pageCanvases = [];
+            const pageHeights = []; // Store each page height for PDF export
             let totalH = 0;
             let maxW = 0;
             for (let i = 1; i <= numPages; i++) {
@@ -419,6 +426,7 @@ async function processFile(file) {
                 c.width = vp.width; c.height = vp.height;
                 await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
                 pageCanvases.push(c);
+                pageHeights.push(vp.height);
                 totalH += vp.height;
                 if (vp.width > maxW) maxW = vp.width;
             }
@@ -435,6 +443,10 @@ async function processFile(file) {
             }
 
             DM.docImage = combined.toDataURL('image/jpeg', 0.85);
+            // Store page info for proper PDF export
+            DM.docPages = pageCanvases.map(c => c.toDataURL('image/jpeg', 0.85));
+            DM.pageHeights = pageHeights;
+            DM.pageWidth = maxW;
             if (numPages > 1) toast(`${numPages} דפים נטענו בהצלחה`);
             render();
         } catch (err) {
@@ -898,6 +910,9 @@ function sendDocument() {
         id: 'dm_' + Date.now(),
         fileName: DM.fileName,
         docImage: DM.docImage,
+        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
+        pageHeights: DM.pageHeights || [],
+        pageWidth: DM.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(DM.recipients)),
         fields: JSON.parse(JSON.stringify(DM.fields)),
         status: 'sent',
@@ -945,6 +960,9 @@ function saveTemplate() {
         id: DM.editingTemplateId || 'tpl_' + Date.now(),
         name: DM.fileName || 'תבנית ללא שם',
         docImage: DM.docImage,
+        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
+        pageHeights: DM.pageHeights || [],
+        pageWidth: DM.pageWidth || 0,
         fields: JSON.parse(JSON.stringify(DM.fields)),
         fixedFields: DM.fields.filter(f => f.fixed),
         createdAt: new Date().toISOString()
@@ -1069,7 +1087,7 @@ function renderSignView(el) {
                 ${isComplete ? '<span class="badge badge-success">הושלם</span>' : isExpired ? '<span class="badge badge-danger">פג תוקף</span>' : '<span class="badge badge-warning">ממתין לחתימה</span>'}
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד קובץ">${ICO.download} הורדה</button>
+                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">${ICO.download} PDF</button>
                 ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">${ICO.log}</button>` : ''}
             </div>
         </div>
@@ -1180,7 +1198,7 @@ function renderSignView(el) {
                         </div>
                     </div>
                     ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
-                    ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">${ICO.download} הורד קובץ חתום</button>` : ''}
+                    ${isComplete ? `<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="downloadSignedPDF('${doc.id}')">${ICO.download} הורד PDF חתום</button>` : ''}
                 `}
             </div>
         </div>
@@ -1255,80 +1273,196 @@ function sendReminder(docId, recipientId) {
 async function downloadSignedPDF(docId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
-    toast('מכין מסמך להורדה...', 'info');
+    toast('מכין PDF להורדה...', 'info');
 
     try {
-        // Load main document image
-        const img = await loadImage(doc.docImage);
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-
-        // Scale factor from displayed size (800px) to actual image size
-        const scale = img.width / 800;
-
-        // Pre-load all signature images first
+        // Pre-load all signature images
         const sigFields = (doc.fields || []).filter(f => f.signatureData);
         const sigImages = {};
         await Promise.all(sigFields.map(async f => {
-            try {
-                sigImages[f.id] = await loadImage(f.signatureData);
-            } catch(e) { /* skip failed loads */ }
+            try { sigImages[f.id] = await loadImage(f.signatureData); } catch(e) {}
         }));
 
         // Pre-load all file attachment images
         const fileFields = (doc.fields || []).filter(f => f.fileData);
         const fileImages = {};
         await Promise.all(fileFields.map(async f => {
-            try {
-                fileImages[f.id] = await loadImage(f.fileData);
-            } catch(e) { /* skip failed loads */ }
+            try { fileImages[f.id] = await loadImage(f.fileData); } catch(e) {}
         }));
 
-        // Draw all field values on canvas - NO colored backgrounds, clean output
-        (doc.fields || []).forEach(f => {
-            const val = f.signedValue || f.value || '';
-            if (!val && !f.signatureData && !f.fileData) return;
-            const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
-            if (f.signatureData && sigImages[f.id]) {
-                ctx.drawImage(sigImages[f.id], fx, fy, fw, fh);
-            } else if (f.fileData && fileImages[f.id]) {
-                ctx.drawImage(fileImages[f.id], fx, fy, fw, fh);
-            } else if (val) {
-                // Clean text without colored background
-                ctx.fillStyle = '#1e293b';
-                ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = 'center';
-                ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
-            }
-        });
-
-        // Add completion watermark if completed
-        if (doc.status === 'completed') {
-            ctx.save();
-            ctx.globalAlpha = 0.08;
-            ctx.fillStyle = '#16a34a';
-            ctx.font = `bold ${80 * scale}px Arial`;
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate(-Math.PI / 6);
-            ctx.textAlign = 'center';
-            ctx.fillText('SIGNED', 0, 0);
-            ctx.restore();
+        // Helper: draw fields onto a canvas within a y-range
+        function drawFields(ctx, scale, yOffset, pageH) {
+            (doc.fields || []).forEach(f => {
+                const val = f.signedValue || f.value || '';
+                if (!val && !f.signatureData && !f.fileData) return;
+                const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
+                // Check if field is within this page's y-range
+                if (fy + fh < yOffset || fy > yOffset + pageH) return;
+                const adjY = fy - yOffset;
+                if (f.signatureData && sigImages[f.id]) {
+                    ctx.drawImage(sigImages[f.id], fx, adjY, fw, fh);
+                } else if (f.fileData && fileImages[f.id]) {
+                    ctx.drawImage(fileImages[f.id], fx, adjY, fw, fh);
+                } else if (val) {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
+                    ctx.textBaseline = 'middle';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(val, fx + fw / 2, adjY + fh / 2, fw - 4);
+                }
+            });
         }
 
-        // Download as PNG
-        const link = document.createElement('a');
-        link.download = `${doc.fileName || 'signed-document'}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        toast('הקובץ הורד!');
+        // Check if jsPDF is available
+        const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (!jsPDF) {
+            // Fallback to PNG if jsPDF not loaded
+            console.warn('jsPDF not available, falling back to PNG');
+            await downloadAsPNG(doc, sigImages, fileImages);
+            return;
+        }
+
+        const mainImg = await loadImage(doc.docImage);
+        const imgW = mainImg.width;
+        const scale = imgW / 800;
+
+        // Determine if we have multi-page info
+        const hasPages = doc.docPages && doc.docPages.length > 1 && doc.pageHeights && doc.pageHeights.length > 1;
+
+        if (hasPages) {
+            // Multi-page PDF: render each page separately
+            const pageImgs = [];
+            for (const pgSrc of doc.docPages) {
+                pageImgs.push(await loadImage(pgSrc));
+            }
+
+            // Create PDF with first page dimensions
+            const firstPage = pageImgs[0];
+            const pdfW = firstPage.width;
+            const pdfH = firstPage.height;
+            const orientation = pdfW > pdfH ? 'l' : 'p';
+            const pdf = new jsPDF({ orientation, unit: 'px', format: [pdfW, pdfH], compress: true });
+
+            let yOffset = 0;
+            for (let i = 0; i < pageImgs.length; i++) {
+                const pgImg = pageImgs[i];
+                const pgW = pgImg.width;
+                const pgH = pgImg.height;
+
+                if (i > 0) pdf.addPage([pgW, pgH], pgW > pgH ? 'l' : 'p');
+
+                // Draw page background
+                const pgCanvas = document.createElement('canvas');
+                pgCanvas.width = pgW;
+                pgCanvas.height = pgH;
+                const pgCtx = pgCanvas.getContext('2d');
+                pgCtx.drawImage(pgImg, 0, 0);
+
+                // Draw fields for this page
+                drawFields(pgCtx, scale, yOffset, pgH);
+
+                // Add watermark if completed
+                if (doc.status === 'completed') {
+                    pgCtx.save();
+                    pgCtx.globalAlpha = 0.06;
+                    pgCtx.fillStyle = '#16a34a';
+                    pgCtx.font = `bold ${60 * scale}px Arial`;
+                    pgCtx.translate(pgW / 2, pgH / 2);
+                    pgCtx.rotate(-Math.PI / 6);
+                    pgCtx.textAlign = 'center';
+                    pgCtx.fillText('SIGNED', 0, 0);
+                    pgCtx.restore();
+                }
+
+                const pgData = pgCanvas.toDataURL('image/jpeg', 0.92);
+                pdf.addImage(pgData, 'JPEG', 0, 0, pgW, pgH);
+                yOffset += pgH;
+            }
+
+            pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+        } else {
+            // Single page or legacy document (no page info)
+            const canvas = document.createElement('canvas');
+            canvas.width = mainImg.width;
+            canvas.height = mainImg.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(mainImg, 0, 0);
+
+            // Draw all fields
+            drawFields(ctx, scale, 0, canvas.height);
+
+            // Watermark
+            if (doc.status === 'completed') {
+                ctx.save();
+                ctx.globalAlpha = 0.06;
+                ctx.fillStyle = '#16a34a';
+                ctx.font = `bold ${60 * scale}px Arial`;
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate(-Math.PI / 6);
+                ctx.textAlign = 'center';
+                ctx.fillText('SIGNED', 0, 0);
+                ctx.restore();
+            }
+
+            // Create PDF fitting the image
+            const orientation = canvas.width > canvas.height ? 'l' : 'p';
+            const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], compress: true });
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+        }
+
+        toast('ה-PDF הורד בהצלחה!');
     } catch (err) {
         console.error('Download error:', err);
         toast('שגיאה בהורדת הקובץ', 'error');
     }
+}
+
+// Fallback PNG download if jsPDF unavailable
+async function downloadAsPNG(doc, sigImages, fileImages) {
+    const img = await loadImage(doc.docImage);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const scale = img.width / 800;
+
+    (doc.fields || []).forEach(f => {
+        const val = f.signedValue || f.value || '';
+        if (!val && !f.signatureData && !f.fileData) return;
+        const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
+        if (f.signatureData && sigImages[f.id]) {
+            ctx.drawImage(sigImages[f.id], fx, fy, fw, fh);
+        } else if (f.fileData && fileImages[f.id]) {
+            ctx.drawImage(fileImages[f.id], fx, fy, fw, fh);
+        } else if (val) {
+            ctx.fillStyle = '#1e293b';
+            ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
+        }
+    });
+
+    if (doc.status === 'completed') {
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = '#16a34a';
+        ctx.font = `bold ${60 * scale}px Arial`;
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-Math.PI / 6);
+        ctx.textAlign = 'center';
+        ctx.fillText('SIGNED', 0, 0);
+        ctx.restore();
+    }
+
+    const link = document.createElement('a');
+    link.download = `${doc.fileName || 'signed-document'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('הקובץ הורד (PNG)');
 }
 
 // Helper: load an image and return a promise

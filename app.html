@@ -10,6 +10,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="SmoovSign">
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Cpath d='M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='3.5'/%3E%3Cpolyline points='58 16 58 42 72 42' fill='none' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M36 60c8-12 14 4 18-4s8-14 12-4' stroke='white' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='38' fill='url(%23g)'/%3E%3Cpath d='M105 30H66a14 14 0 00-14 14v92a14 14 0 0014 14h48a14 14 0 0014-14V76l-23-46z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='6'/%3E%3Cpolyline points='105 30 105 76 128 76' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M66 110c14-22 24 8 32-6s14-24 20-6' stroke='white' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
@@ -19,6 +22,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="firebase-config.js"></script>
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <!-- EmailJS SDK for email notifications -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="email-config.js"></script>
