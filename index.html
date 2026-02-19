@@ -432,12 +432,56 @@
         }
 
         /* ==================== PRICING ==================== */
+        .pricing-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        .pricing-toggle span {
+            font-size: 0.92rem;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+        .pricing-toggle span.active { color: var(--text); font-weight: 700; }
+        .toggle-switch {
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.on { background: var(--primary); }
+        .toggle-switch::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+        .toggle-switch.on::after { transform: translateX(-22px); }
+        .save-badge {
+            background: #dcfce7;
+            color: var(--success);
+            padding: 2px 10px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
         .pricing-grid {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 24px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
             align-items: start;
         }
         .price-card {
@@ -456,11 +500,22 @@
         .price-card.featured {
             border: 2px solid var(--primary);
             box-shadow: var(--shadow-lg);
-            transform: scale(1.04);
             z-index: 1;
+            position: relative;
+            overflow: visible;
         }
-        .price-card.featured:hover {
-            transform: scale(1.04) translateY(-4px);
+        .price-ribbon {
+            position: absolute;
+            top: 18px;
+            left: -8px;
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            color: white;
+            padding: 6px 20px 6px 14px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            transform: rotate(4deg);
+            box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+            border-radius: 0 4px 4px 0;
         }
         .price-badge {
             position: absolute;
@@ -674,6 +729,7 @@
         @media (max-width: 1024px) {
             .hero-mockup { max-width: 480px; }
             .mockup-sidebar { display: none; }
+            .pricing-grid { grid-template-columns: repeat(2, 1fr); max-width: 700px; }
         }
 
         @media (max-width: 768px) {
@@ -698,14 +754,17 @@
             .steps::before { display: none; }
 
             .pricing-grid {
-                grid-template-columns: 1fr;
-                max-width: 400px;
+                grid-template-columns: 1fr 1fr;
+                max-width: 500px;
                 margin: 0 auto;
             }
-            .price-card.featured { transform: none; }
-            .price-card.featured:hover { transform: translateY(-4px); }
+            .price-card.featured .price-ribbon { display: none; }
 
             .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+        }
+
+        @media (max-width: 520px) {
+            .pricing-grid { grid-template-columns: 1fr; max-width: 340px; }
         }
 
         @media (max-width: 400px) {
@@ -891,57 +950,80 @@
     <section class="section" id="pricing">
         <h2 class="section-title reveal">מחירון</h2>
         <p class="section-sub reveal">בחרו את המסלול המתאים לכם</p>
+        <div class="pricing-toggle reveal">
+            <span class="active" id="toggleMonthly">חודשי</span>
+            <div class="toggle-switch" id="billingToggle" onclick="toggleBilling()"></div>
+            <span id="toggleYearly">שנתי</span>
+            <span class="save-badge">חסכו 20%</span>
+        </div>
         <div class="pricing-grid">
             <!-- FREE -->
             <div class="price-card reveal">
-                <div class="price-name">חינם</div>
-                <div class="price-target">ליחידים</div>
-                <div class="price-amount">0<span>&#8362;</span></div>
-                <div class="price-period">לתמיד</div>
+                <div class="price-name">Free</div>
+                <div class="price-target">לשימוש אישי</div>
+                <div class="price-amount"><span>&#8362;</span>0</div>
+                <div class="price-period">לתמיד, ללא עלות</div>
                 <ul class="price-features">
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>5 מסמכים בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>10 שליחות בחודש</li>
                     <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>2 נמענים למסמך</li>
                     <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>תבנית אחת</li>
                     <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>קוד אימות למסמך</li>
                     <li><span class="dash">&ndash;</span><span style="color:var(--text-muted)">התראות מייל</span></li>
-                    <li><span class="dash">&ndash;</span><span style="color:var(--text-muted)">סנכרון ענן</span></li>
                 </ul>
                 <a href="app.html" class="btn btn-outline price-btn">התחל בחינם</a>
             </div>
 
-            <!-- BASIC (featured) -->
+            <!-- BASIC -->
             <div class="price-card featured reveal">
-                <div class="price-badge">מומלץ</div>
-                <div class="price-name">בסיסי</div>
-                <div class="price-target">לעסקים קטנים</div>
-                <div class="price-amount">49<span>&#8362;</span></div>
-                <div class="price-period">לחודש</div>
+                <div class="price-ribbon">חבילה מומלצת</div>
+                <div class="price-name">Basic</div>
+                <div class="price-target">ליחידים ועסקים קטנים</div>
+                <div class="price-amount" data-monthly="29" data-yearly="279"><span>&#8362;</span><span class="price-val">29</span></div>
+                <div class="price-period"><span class="period-text">לחודש</span></div>
                 <ul class="price-features">
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>50 מסמכים בחודש</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>10 נמענים למסמך</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>10 תבניות</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית + טקסט</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>התראות מייל</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>כל היכולות מתוכנית Free</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>30 שליחות בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>5 תבניות</li>
                     <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>סנכרון ענן</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>התראות מייל</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>קישור מילוי פומבי</li>
                 </ul>
                 <a href="app.html" class="btn btn-primary price-btn">התחל תקופת ניסיון</a>
             </div>
 
             <!-- PRO -->
             <div class="price-card reveal">
-                <div class="price-name">פרו</div>
-                <div class="price-target">לצוותים</div>
-                <div class="price-amount">99<span>&#8362;</span></div>
-                <div class="price-period">לחודש</div>
+                <div class="price-name">Pro</div>
+                <div class="price-target">לעסקים בינוניים</div>
+                <div class="price-amount" data-monthly="59" data-yearly="569"><span>&#8362;</span><span class="price-val">59</span></div>
+                <div class="price-period"><span class="period-text">לחודש</span></div>
                 <ul class="price-features">
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>מסמכים ללא הגבלה</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>נמענים ללא הגבלה</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>תבניות ללא הגבלה</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>חתימה ידנית + טקסט + חותמת</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>כל היכולות מתוכנית Basic</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>100 שליחות בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>15 תבניות</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>סבב חתימות (סדר חותמים)</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>מעטפות מסמכים</li>
                     <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>התראות מייל + וואטסאפ</li>
-                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>סנכרון ענן + גיבוי + יומן פעילות</li>
                 </ul>
                 <a href="app.html" class="btn btn-outline price-btn">התחל תקופת ניסיון</a>
+            </div>
+
+            <!-- BUSINESS -->
+            <div class="price-card reveal">
+                <div class="price-name">Business</div>
+                <div class="price-target">לחברות וצוותים</div>
+                <div class="price-amount" data-monthly="129" data-yearly="1249"><span>&#8362;</span><span class="price-val">129</span></div>
+                <div class="price-period"><span class="period-text">לחודש</span></div>
+                <ul class="price-features">
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>כל היכולות מתוכנית Pro</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>300 שליחות בחודש</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>תבניות ללא הגבלה</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>ניהול עובדים והרשאות</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>יומן פעילות מפורט</li>
+                    <li><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>גישת API</li>
+                </ul>
+                <a href="app.html" class="btn btn-outline price-btn">צור קשר</a>
             </div>
         </div>
     </section>
@@ -1002,6 +1084,22 @@
         }
         function closeMobileMenu() {
             document.getElementById('mobileMenu').classList.remove('open');
+        }
+
+        // Billing toggle (monthly/yearly)
+        let isYearly = false;
+        function toggleBilling() {
+            isYearly = !isYearly;
+            document.getElementById('billingToggle').classList.toggle('on', isYearly);
+            document.getElementById('toggleMonthly').classList.toggle('active', !isYearly);
+            document.getElementById('toggleYearly').classList.toggle('active', isYearly);
+            document.querySelectorAll('.price-amount[data-monthly]').forEach(el => {
+                const val = el.querySelector('.price-val');
+                val.textContent = isYearly ? el.dataset.yearly : el.dataset.monthly;
+            });
+            document.querySelectorAll('.period-text').forEach(el => {
+                el.textContent = isYearly ? 'לשנה' : 'לחודש';
+            });
         }
 
         // Scroll reveal
