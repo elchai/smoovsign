@@ -3,7 +3,7 @@
 
 // ==================== STATE ====================
 const DM = {
-    view: 'dashboard', // dashboard, templates, create, sign
+    view: 'home', // home, docs_all, docs_sent, docs_drafts, docs_deleted, docs_waiting, templates, contacts, create, sign
     docs: JSON.parse(localStorage.getItem('smoov_docs') || '[]'),
     templates: JSON.parse(localStorage.getItem('smoov_templates') || '[]'),
     // Editor state
@@ -68,8 +68,96 @@ function toast(msg, type = 'success') {
 // ==================== NAVIGATION ====================
 function switchView(view) {
     DM.view = view;
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    // Reset sub-filters when switching views
+    if (!view.startsWith('docs_')) { DM._dashFilter = 'all'; DM._dashSearch = ''; }
+    closeMobileMenu(); // close sidebar on mobile after navigation
     render();
+}
+
+// Sidebar expand state
+if (!DM._sidebarOpen) DM._sidebarOpen = { docs: true, templates: false };
+
+function toggleSidebarGroup(group) {
+    DM._sidebarOpen[group] = !DM._sidebarOpen[group];
+    renderSidebar();
+}
+
+function renderSidebar() {
+    const sb = document.getElementById('appSidebar');
+    if (!sb) return;
+
+    const v = DM.view;
+    const waitingCount = DM.docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date())).length;
+    const docsOpen = DM._sidebarOpen.docs;
+    const tplOpen = DM._sidebarOpen.templates;
+    const isDocView = v.startsWith('docs_') || v === 'home';
+
+    sb.innerHTML = `
+        <button class="sidebar-send-btn" onclick="newDocument()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            שלח מסמך
+        </button>
+
+        <button class="sidebar-item ${v === 'home' ? 'active' : ''}" onclick="switchView('home')">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+            ראשי
+        </button>
+
+        <button class="sidebar-group-header ${docsOpen ? 'open' : ''}" onclick="toggleSidebarGroup('docs')">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            מסמכים
+            <span class="sidebar-arrow">▼</span>
+        </button>
+        <div class="sidebar-group-items ${docsOpen ? 'open' : ''}">
+            <button class="sidebar-item sidebar-sub ${v === 'docs_all' ? 'active' : ''}" onclick="switchView('docs_all')">כל המסמכים</button>
+            <button class="sidebar-item sidebar-sub ${v === 'docs_sent' ? 'active' : ''}" onclick="switchView('docs_sent')">נשלח</button>
+            <button class="sidebar-item sidebar-sub ${v === 'docs_drafts' ? 'active' : ''}" onclick="switchView('docs_drafts')">טיוטות</button>
+            <button class="sidebar-item sidebar-sub ${v === 'docs_deleted' ? 'active' : ''}" onclick="switchView('docs_deleted')">נמחק</button>
+            <button class="sidebar-item sidebar-sub ${v === 'docs_waiting' ? 'active' : ''}" onclick="switchView('docs_waiting')">
+                ממתינים לי
+                ${waitingCount > 0 ? `<span class="sidebar-badge">${waitingCount}</span>` : ''}
+            </button>
+        </div>
+
+        <button class="sidebar-group-header ${tplOpen ? 'open' : ''}" onclick="toggleSidebarGroup('templates')">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+            תבניות
+            <span class="sidebar-arrow">▼</span>
+        </button>
+        <div class="sidebar-group-items ${tplOpen ? 'open' : ''}">
+            <button class="sidebar-item sidebar-sub ${v === 'templates' ? 'active' : ''}" onclick="switchView('templates')">טפסים</button>
+            <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 מעטפות</button>
+            <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 סבב אישורים</button>
+            <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 צ'קליסטים</button>
+            <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 אוטומציות</button>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <button class="sidebar-item locked" title="בקרוב">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
+            משאבי אנוש 🔒
+        </button>
+        <button class="sidebar-item ${v === 'contacts' ? 'active' : ''}" onclick="switchView('contacts')">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            אנשי קשר
+        </button>
+        <button class="sidebar-item locked" title="בקרוב">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+            משימות 🔒
+        </button>
+        <button class="sidebar-item locked" title="בקרוב">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+            דוחות 🔒
+        </button>
+
+        <div class="sidebar-divider"></div>
+
+        <button class="sidebar-item locked" title="בקרוב">
+            <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.2.65.76 1.09 1.44 1.09H21a2 2 0 010 4h-.09c-.68 0-1.24.44-1.44 1.09z"/></svg></span>
+            הגדרות 🔒
+        </button>
+    `;
 }
 
 function render() {
@@ -82,11 +170,25 @@ function render() {
     if (signDoc) scrolls.signDoc = { x: signDoc.scrollLeft, y: signDoc.scrollTop };
     if (wizardBody) scrolls.wizard = { y: wizardBody.scrollTop };
 
+    // Toggle fullscreen mode for wizard/sign views
+    const isFullscreen = DM.view === 'create' || DM.view === 'sign';
+    document.body.classList.toggle('fullscreen-view', isFullscreen);
+
+    // Render sidebar for non-fullscreen views
+    if (!isFullscreen) renderSidebar();
+
     const main = document.getElementById('mainContent');
-    if (DM.view === 'dashboard') renderDashboard(main);
-    else if (DM.view === 'templates') renderTemplates(main);
-    else if (DM.view === 'create') renderWizard(main);
-    else if (DM.view === 'sign') renderSignView(main);
+    const v = DM.view;
+    if (v === 'home') renderHome(main);
+    else if (v === 'docs_all') renderDocTable(main, 'all');
+    else if (v === 'docs_sent') renderDocTable(main, 'sent');
+    else if (v === 'docs_drafts') renderDocTable(main, 'drafts');
+    else if (v === 'docs_deleted') renderDocTable(main, 'deleted');
+    else if (v === 'docs_waiting') renderDocTable(main, 'waiting');
+    else if (v === 'templates') renderTemplates(main);
+    else if (v === 'contacts') renderContacts(main);
+    else if (v === 'create') renderWizard(main);
+    else if (v === 'sign') renderSignView(main);
 
     // Restore scroll positions after re-render
     requestAnimationFrame(() => {
@@ -105,79 +207,285 @@ function render() {
     });
 }
 
-// ==================== DASHBOARD ====================
-function renderDashboard(el) {
-    const allDocs = DM.docs.slice().reverse();
-    const total = allDocs.length;
-    const completed = allDocs.filter(d => d.status === 'completed' || (d.recipients || []).every(r => r.signed)).length;
-    const expired = allDocs.filter(d => d.expiresAt && new Date(d.expiresAt) < new Date() && d.status !== 'completed').length;
-    const pending = total - completed - expired;
-    const filter = DM._dashFilter || 'all';
-    const search = DM._dashSearch || '';
-
-    let docs = allDocs;
-    if (filter === 'pending') docs = docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()));
-    else if (filter === 'completed') docs = docs.filter(d => d.status === 'completed');
-    else if (filter === 'expired') docs = docs.filter(d => d.expiresAt && new Date(d.expiresAt) < new Date() && d.status !== 'completed');
-    if (search) docs = docs.filter(d => (d.fileName || '').includes(search) || (d.recipients || []).some(r => (r.name || '').includes(search)));
+// ==================== HOME DASHBOARD ====================
+function renderHome(el) {
+    const allDocs = DM.docs.filter(d => !d._deleted).slice().reverse();
+    const completed = allDocs.filter(d => d.status === 'completed').length;
+    const inProcess = allDocs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date())).length;
+    const waiting = allDocs.filter(d => d.status !== 'completed' && d._isWaiting).length;
+    const recentDocs = allDocs.slice(0, 10);
 
     el.innerHTML = `<div class="dashboard">
-        <div class="dashboard-header">
-            <h1>המסמכים שלי</h1>
-        </div>
         <div class="dashboard-stats">
-            <div class="stat-card clickable ${filter === 'all' ? 'stat-active' : ''}" onclick="DM._dashFilter='all';render()"><div class="stat-num">${total}</div><div class="stat-label">סה"כ מסמכים</div></div>
-            <div class="stat-card clickable ${filter === 'pending' ? 'stat-active' : ''}" onclick="DM._dashFilter='pending';render()"><div class="stat-num" style="color:var(--warning)">${pending}</div><div class="stat-label">ממתינים</div></div>
-            <div class="stat-card clickable ${filter === 'completed' ? 'stat-active' : ''}" onclick="DM._dashFilter='completed';render()"><div class="stat-num" style="color:var(--success)">${completed}</div><div class="stat-label">הושלמו</div></div>
-            <div class="stat-card clickable ${filter === 'expired' ? 'stat-active' : ''}" onclick="DM._dashFilter='expired';render()"><div class="stat-num" style="color:var(--danger)">${expired}</div><div class="stat-label">פג תוקף</div></div>
+            <div class="stat-card" style="border-top:3px solid #f472b6;" onclick="switchView('docs_waiting')">
+                <div class="stat-num">${inProcess}</div><div class="stat-label">ממתין לחתימה שלי</div>
+            </div>
+            <div class="stat-card" style="border-top:3px solid var(--success);" onclick="switchView('docs_all')">
+                <div class="stat-num" style="color:var(--success)">${completed}</div><div class="stat-label">נחתמו לאחרונה</div>
+            </div>
+            <div class="stat-card" style="border-top:3px solid var(--primary);" onclick="switchView('docs_sent')">
+                <div class="stat-num" style="color:var(--primary)">${inProcess}</div><div class="stat-label">בתהליך חתימה</div>
+            </div>
+            <div class="stat-card" style="border-top:3px solid var(--warning);">
+                <div class="stat-num" style="color:var(--warning)">0</div><div class="stat-label">משימות פתוחות</div>
+            </div>
         </div>
-        <div class="dashboard-search">
-            <input type="text" class="form-input" placeholder="חפש מסמך או נמען..." value="${search}" oninput="DM._dashSearch=this.value;render()" style="max-width:400px;">
+
+        <div style="margin-bottom:24px;">
+            <h2 style="font-size:1.15em;font-weight:700;margin-bottom:14px;">שליחת מסמך</h2>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                ${DM.templates.slice(0, 4).map(t => `
+                    <div class="template-quick-card" onclick="useTemplate('${t.id}')">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span style="font-size:0.82em;font-weight:600;margin-top:6px;">${t.name || 'תבנית'}</span>
+                    </div>
+                `).join('')}
+                <div class="template-quick-card" onclick="newDocument()" style="border:2px dashed var(--border);">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span style="font-size:0.82em;font-weight:600;margin-top:6px;">העלאת מסמך</span>
+                </div>
+            </div>
         </div>
-        ${docs.length === 0 ? `
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 style="font-size:1.15em;font-weight:700;">מסמכים אחרונים</h2>
+            <a href="#" onclick="event.preventDefault();switchView('docs_all')" style="font-size:0.85em;color:var(--primary);font-weight:600;">כל המסמכים →</a>
+        </div>
+        ${recentDocs.length === 0 ? `
             <div class="empty-state">
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <h2>${search || filter !== 'all' ? 'לא נמצאו מסמכים' : 'אין מסמכים עדיין'}</h2>
-                <p>${search || filter !== 'all' ? 'נסה לשנות את הסינון או החיפוש' : 'צור מסמך חדש או השתמש בתבנית קיימת'}</p>
-                ${!search && filter === 'all' ? `<button class="btn btn-primary btn-lg" onclick="newDocument()">+ צור מסמך חדש</button>` : ''}
+                <h2>אין מסמכים עדיין</h2>
+                <p>צור מסמך חדש או השתמש בתבנית קיימת</p>
             </div>
-        ` : `<div class="doc-list">${docs.map(d => renderDocCard(d)).join('')}</div>`}
+        ` : `<div class="doc-table-wrap">${renderDocRows(recentDocs)}</div>`}
     </div>`;
 }
 
-function renderDocCard(doc) {
-    const signedCount = (doc.recipients || []).filter(r => r.signed).length;
-    const totalR = (doc.recipients || []).length;
-    const pct = totalR > 0 ? Math.round((signedCount / totalR) * 100) : 0;
-    const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date() && doc.status !== 'completed';
-    const statusClass = doc.status === 'completed' ? 'status-complete' : isExpired ? 'status-expired' : pct > 0 ? 'status-pending' : 'status-waiting';
-    const statusText = doc.status === 'completed' ? 'הושלם' : isExpired ? 'פג תוקף' : pct > 0 ? 'בתהליך' : 'ממתין';
-    const statusColor = doc.status === 'completed' ? 'var(--success)' : isExpired ? 'var(--danger)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
-    const created = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('he-IL') : '';
+// ==================== DOCUMENT TABLE VIEW ====================
+function renderDocTable(el, mode) {
+    const allDocs = DM.docs.slice().reverse();
+    const search = DM._dashSearch || '';
+    const titles = { all: 'כל המסמכים', sent: 'נשלח', drafts: 'טיוטות', deleted: 'מסמכים שנמחקו', waiting: 'המסמכים מטה ממתינים לחתימתך' };
 
-    return `<div class="doc-card" onclick="openSign('${doc.id}')">
-        <div class="doc-thumb">${doc.docImage ? `<img src="${doc.docImage}" alt="">` : ''}</div>
-        <div class="doc-info">
-            <div style="display:flex;align-items:center;gap:6px;">
-                <h3>${doc.fileName || 'מסמך ללא שם'}</h3>
-                <span class="badge ${doc.status === 'completed' ? 'badge-success' : isExpired ? 'badge-danger' : 'badge-warning'}" style="font-size:0.65em;">${statusText}</span>
-            </div>
-            <div class="doc-meta">${created}${doc.createdBy ? ' · ' + doc.createdBy : ''} · ${totalR} נמענים${doc.expiresAt ? ' · תוקף: ' + new Date(doc.expiresAt).toLocaleDateString('he-IL') : ''}</div>
-            <div class="doc-progress">
-                <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${statusColor}"></div></div>
-                <span class="doc-status ${statusClass}">${signedCount}/${totalR} חתמו</span>
-            </div>
+    let docs = allDocs;
+    if (mode === 'deleted') docs = docs.filter(d => d._deleted);
+    else {
+        docs = docs.filter(d => !d._deleted); // exclude deleted from all other views
+        if (mode === 'sent') docs = docs.filter(d => d.status === 'completed' || (d.recipients || []).some(r => r.signed));
+        else if (mode === 'drafts') docs = docs.filter(d => !d.sentAt && d.status !== 'completed');
+        else if (mode === 'waiting') docs = docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()));
+    }
+
+    if (search) docs = docs.filter(d => (d.fileName || '').includes(search) || (d.recipients || []).some(r => (r.name || '').includes(search)));
+
+    // Pagination
+    const pageSize = 15;
+    const page = DM._docPage || 1;
+    const totalPages = Math.max(1, Math.ceil(docs.length / pageSize));
+    const pageDocs = docs.slice((page - 1) * pageSize, page * pageSize);
+
+    el.innerHTML = `<div class="dashboard">
+        <h1 style="font-size:1.4em;font-weight:800;margin-bottom:18px;">${titles[mode] || 'מסמכים'}</h1>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+            <input type="text" class="form-input" placeholder="חיפוש..." value="${search}" oninput="DM._dashSearch=this.value;DM._docPage=1;render()" style="max-width:240px;padding:8px 14px;font-size:0.88em;">
+            ${mode === 'sent' ? `
+                <div style="display:flex;gap:4px;">
+                    <button class="btn btn-sm ${(DM._sentFilter||'all')==='all'?'btn-primary':'btn-outline'}" onclick="DM._sentFilter='all';render()">הכל</button>
+                    <button class="btn btn-sm ${DM._sentFilter==='process'?'btn-primary':'btn-outline'}" onclick="DM._sentFilter='process';render()">בתהליך</button>
+                    <button class="btn btn-sm ${DM._sentFilter==='done'?'btn-primary':'btn-outline'}" onclick="DM._sentFilter='done';render()">הושלם</button>
+                </div>
+            ` : ''}
         </div>
-        <div class="doc-actions" onclick="event.stopPropagation()">
-            <button class="btn btn-sm btn-outline" onclick="deleteDoc('${doc.id}')">מחק</button>
-        </div>
+        ${pageDocs.length === 0 ? `
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <h2>אין מסמכים</h2>
+            </div>
+        ` : `
+            <div class="doc-table-wrap">
+                <div class="doc-table-header">
+                    <span class="dtc dtc-name">שם מסמך</span>
+                    <span class="dtc dtc-rcpt">נשלח אל</span>
+                    <span class="dtc dtc-status">סטטוס</span>
+                    <span class="dtc dtc-actions"></span>
+                </div>
+                ${renderDocRows(pageDocs, mode)}
+            </div>
+            ${totalPages > 1 ? `
+                <div class="pagination">
+                    ${Array.from({length: totalPages}, (_, i) => `
+                        <button class="page-btn ${page === i+1 ? 'active' : ''}" onclick="DM._docPage=${i+1};render()">${i+1}</button>
+                    `).join('')}
+                    <span style="font-size:0.78em;color:var(--text-light);margin-right:12px;">${docs.length} פריטים</span>
+                </div>
+            ` : ''}
+        `}
     </div>`;
+}
+
+function renderDocRows(docs, mode) {
+    return docs.map(doc => {
+        const signedCount = (doc.recipients || []).filter(r => r.signed).length;
+        const totalR = (doc.recipients || []).length;
+        const pct = totalR > 0 ? Math.round((signedCount / totalR) * 100) : 0;
+        const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date() && doc.status !== 'completed';
+        const statusText = doc.status === 'completed' ? 'אושר' : isExpired ? 'פג תוקף' : pct > 0 ? 'בתהליך' : 'ממתין';
+        const statusBadge = doc.status === 'completed' ? 'badge-success' : isExpired ? 'badge-danger' : pct > 0 ? 'badge-warning' : 'badge-info';
+        const statusColor = doc.status === 'completed' ? 'var(--success)' : isExpired ? 'var(--danger)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
+        const created = doc.createdAt ? new Date(doc.createdAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+        const rcptName = (doc.recipients || [])[0]?.name || '';
+        const rcptInitials = rcptName ? rcptName.split(' ').map(w => w[0]).join('').substring(0, 2) : '?';
+
+        return `<div class="doc-table-row" onclick="openSign('${doc.id}')">
+            <div class="dtc dtc-name">
+                <div>
+                    <div style="font-weight:600;font-size:0.9em;">${doc.fileName || 'מסמך ללא שם'}</div>
+                    <div style="font-size:0.75em;color:var(--text-light);">${created}</div>
+                </div>
+            </div>
+            <div class="dtc dtc-rcpt">
+                <span class="avatar-initials">${rcptInitials}</span>
+                <span style="font-size:0.85em;">${rcptName || '-'}</span>
+            </div>
+            <div class="dtc dtc-status">
+                <span class="badge ${statusBadge}">${statusText}</span>
+                ${totalR > 0 ? `
+                    <div class="mini-progress" style="width:80px;margin-top:4px;"><div class="mini-progress-fill" style="width:${pct}%;background:${statusColor};"></div></div>
+                    <span style="font-size:0.7em;color:var(--text-light);">${signedCount} מתוך ${totalR} חתמו</span>
+                ` : ''}
+            </div>
+            <div class="dtc dtc-actions" onclick="event.stopPropagation()">
+                <button class="btn btn-ghost btn-sm" onclick="openSign('${doc.id}')" title="צפייה">${ICO.eye}</button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורדה">${ICO.download}</button>
+                ${mode === 'waiting' ? `<button class="btn btn-primary btn-sm" onclick="openSign('${doc.id}')">מילוי טופס</button>` : ''}
+                ${mode === 'deleted' ? `<button class="btn btn-outline btn-sm" onclick="restoreDoc('${doc.id}')">שחזור</button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function deleteDoc(id) {
     if (!confirm('למחוק מסמך זה?')) return;
-    DM.docs = DM.docs.filter(d => d.id !== id);
+    const doc = DM.docs.find(d => d.id === id);
+    if (doc) { doc._deleted = true; doc._deletedAt = new Date().toISOString(); }
     save();
+    render();
+}
+
+function restoreDoc(id) {
+    const doc = DM.docs.find(d => d.id === id);
+    if (doc) { delete doc._deleted; delete doc._deletedAt; }
+    save();
+    render();
+}
+
+// ==================== CONTACTS ====================
+function renderContacts(el) {
+    if (!DM.contacts) DM.contacts = JSON.parse(localStorage.getItem('smoov_contacts') || '[]');
+    const search = DM._contactSearch || '';
+    let contacts = DM.contacts;
+    if (search) contacts = contacts.filter(c => (c.name || '').includes(search) || (c.email || '').includes(search) || (c.phone || '').includes(search));
+
+    el.innerHTML = `<div class="dashboard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <h1 style="font-size:1.4em;font-weight:800;">אנשי קשר</h1>
+            <button class="btn btn-success" onclick="addContact()">+ הוסף איש קשר</button>
+        </div>
+        <div style="margin-bottom:16px;">
+            <input type="text" class="form-input" placeholder="חיפוש..." value="${search}" oninput="DM._contactSearch=this.value;render()" style="max-width:300px;padding:8px 14px;font-size:0.88em;">
+        </div>
+        ${contacts.length === 0 ? `
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <h2>${search ? 'לא נמצאו אנשי קשר' : 'אין אנשי קשר עדיין'}</h2>
+            </div>
+        ` : `
+            <div class="doc-table-wrap">
+                <div class="doc-table-header">
+                    <span class="dtc" style="flex:2;">שם</span>
+                    <span class="dtc" style="flex:2;">דוא"ל</span>
+                    <span class="dtc" style="flex:1;">נייד</span>
+                    <span class="dtc" style="flex:1;"></span>
+                </div>
+                ${contacts.map(c => `
+                    <div class="doc-table-row">
+                        <div class="dtc" style="flex:2;display:flex;align-items:center;gap:8px;">
+                            <span class="avatar-initials">${(c.name || '?').split(' ').map(w => w[0]).join('').substring(0, 2)}</span>
+                            <span style="font-weight:600;">${c.name || '-'}</span>
+                        </div>
+                        <div class="dtc" style="flex:2;font-size:0.85em;color:var(--text-light);direction:ltr;">${c.email || '-'}</div>
+                        <div class="dtc" style="flex:1;font-size:0.85em;">${c.phone || '-'}</div>
+                        <div class="dtc" style="flex:1;display:flex;gap:4px;">
+                            <button class="btn btn-primary btn-sm" onclick="editContact('${c.id}')">עריכה</button>
+                            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteContact('${c.id}')">מחק</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `}
+    </div>`;
+}
+
+function addContact() { openContactModal(); }
+
+function editContact(id) {
+    if (!DM.contacts) return;
+    const c = DM.contacts.find(x => x.id === id);
+    if (c) openContactModal(c);
+}
+
+function openContactModal(contact) {
+    const isEdit = !!contact;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'contactModal';
+    overlay.innerHTML = `<div class="modal-card" style="max-width:420px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h3 style="font-weight:700;margin:0;">${isEdit ? 'עריכת איש קשר' : 'איש קשר חדש'}</h3>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('contactModal').remove()" style="font-size:1.1em;">✕</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">שם</label>
+            <input type="text" class="form-input" id="ctName" value="${isEdit ? contact.name || '' : ''}" placeholder="שם מלא">
+        </div>
+        <div class="form-group">
+            <label class="form-label">דוא"ל</label>
+            <input type="email" class="form-input" id="ctEmail" value="${isEdit ? contact.email || '' : ''}" placeholder="email@example.com" dir="ltr">
+        </div>
+        <div class="form-group">
+            <label class="form-label">נייד</label>
+            <input type="tel" class="form-input" id="ctPhone" value="${isEdit ? contact.phone || '' : ''}" placeholder="050-0000000" dir="ltr">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+            <button class="btn btn-outline" onclick="document.getElementById('contactModal').remove()">ביטול</button>
+            <button class="btn btn-primary" onclick="saveContact('${isEdit ? contact.id : ''}')">שמור</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('ctName').focus(), 100);
+}
+
+function saveContact(editId) {
+    const name = document.getElementById('ctName').value.trim();
+    const email = document.getElementById('ctEmail').value.trim();
+    const phone = document.getElementById('ctPhone').value.trim();
+    if (!name) { toast('יש להזין שם', 'error'); return; }
+    if (!DM.contacts) DM.contacts = [];
+    if (editId) {
+        const c = DM.contacts.find(x => x.id === editId);
+        if (c) { c.name = name; c.email = email; c.phone = phone; }
+    } else {
+        DM.contacts.push({ id: 'ct_' + Date.now(), name, email, phone });
+    }
+    localStorage.setItem('smoov_contacts', JSON.stringify(DM.contacts));
+    document.getElementById('contactModal')?.remove();
+    render();
+}
+
+function deleteContact(id) {
+    if (!confirm('למחוק איש קשר זה?')) return;
+    DM.contacts = (DM.contacts || []).filter(c => c.id !== id);
+    localStorage.setItem('smoov_contacts', JSON.stringify(DM.contacts));
     render();
 }
 
@@ -299,7 +607,7 @@ function renderWizard(el) {
 
     el.innerHTML = `<div class="wizard">
         <div class="wizard-header">
-            <button class="btn btn-ghost" onclick="switchView('dashboard')">✕ סגור</button>
+            <button class="btn btn-ghost" onclick="switchView('home')">✕ סגור</button>
             <span style="font-weight:700;">${DM.isTemplate ? 'יצירת תבנית' : 'מסמך חדש'}</span>
             <div style="width:80px;"></div>
         </div>
@@ -515,23 +823,88 @@ function renderFieldEditor(el) {
     if (!DM.activeRecipientId && DM.recipients.length) DM.activeRecipientId = DM.recipients[0].id;
     const selField = DM.fields.find(f => f.id === DM.selectedFieldId);
     const zoomPct = Math.round(DM._zoom * 100);
+    const activeRcpt = DM.recipients.find(x => x.id === DM.activeRecipientId);
+    const rcptColor = activeRcpt ? DM.fieldColors[activeRcpt.colorIndex % DM.fieldColors.length] : DM.fieldColors[0];
+    const hasPages = DM.docPages && DM.docPages.length > 1;
+    const numPages = hasPages ? DM.docPages.length : (DM.docImage ? 1 : 0);
+    if (!DM._activePage) DM._activePage = 1;
+
+    // Page break markers for multi-page docs
+    const pageOffsets = getPageYOffsets();
+    const pageBreakMarkers = pageOffsets.length > 1 ? pageOffsets.slice(1).map((offset, i) =>
+        `<div class="page-break-marker" style="top:${offset}px;"><span class="page-break-label">עמוד ${i + 2}</span></div>`
+    ).join('') : '';
 
     el.innerHTML = `<div class="editor">
-        <!-- Left: Props or Thumbnail -->
-        <div class="editor-sidebar ${selField ? '' : 'sidebar-mini'}">
-            ${selField ? renderFieldProps(selField) : `
-                <div style="padding:12px;">
-                    <div style="font-size:0.72em;color:var(--text-light);margin-bottom:8px;">תצוגה מקדימה</div>
-                    <div style="border:2px solid var(--primary);border-radius:8px;overflow:hidden;">
-                        ${DM.docImage ? `<img src="${DM.docImage}" style="width:100%;display:block;opacity:0.8;" alt="">` : ''}
-                    </div>
-                    <div style="margin-top:12px;font-size:0.78em;color:var(--text-light);">שדות: ${DM.fields.length}</div>
-                </div>`}
+        <!-- RIGHT panel (first in RTL flex) -->
+        <div class="editor-panel" id="editorPanel">
+            <button class="panel-toggle-mobile" onclick="document.getElementById('editorPanel').classList.toggle('collapsed')">
+                <span class="panel-toggle-icon">▼</span>
+                <span>כלים</span>
+                <span style="margin-right:auto;font-size:0.8em;color:var(--text-light);">${DM.fields.length} שדות</span>
+            </button>
+            ${selField ? `
+                ${renderFieldProps(selField)}
+                <div style="border-top:2px solid var(--border);"></div>
+            ` : ''}
+            <div class="panel-section">
+                <div class="panel-header">
+                    ${DM.isTemplate ? `
+                        <div class="form-label" style="margin-bottom:6px;">סוג שדה</div>
+                        <div style="display:flex;gap:4px;">
+                            <button class="btn btn-sm" onclick="DM._fieldFixed=false;render();" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 6px;${!DM._fieldFixed ? 'background:#dcfce7;color:#15803d;border:2px solid #16a34a;font-weight:700;box-shadow:0 0 0 3px rgba(22,163,106,0.15);' : 'background:var(--card);color:var(--text-light);border:2px solid var(--border);'}">
+                                <span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block;flex-shrink:0;"></span>דינמי
+                            </button>
+                            <button class="btn btn-sm" onclick="DM._fieldFixed=true;render();" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 6px;${DM._fieldFixed ? 'background:#ffedd5;color:#c2410c;border:2px solid #ea580c;font-weight:700;box-shadow:0 0 0 3px rgba(234,88,12,0.15);' : 'background:var(--card);color:var(--text-light);border:2px solid var(--border);'}">
+                                <span style="width:10px;height:10px;border-radius:50%;background:#ea580c;display:inline-block;flex-shrink:0;"></span>קבוע
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="form-label" style="margin-bottom:6px;">הוספת שדה למילוי עבור</div>
+                        <div class="rcpt-selector">
+                            <select class="form-input" onchange="DM.activeRecipientId=Number(this.value);render();" style="font-weight:700;color:${rcptColor.text};background:${rcptColor.bg};border-color:${rcptColor.border};padding-right:30px;">
+                                ${DM.recipients.map(r => {
+                                    const rc = DM.fieldColors[r.colorIndex % DM.fieldColors.length];
+                                    return `<option value="${r.id}" ${r.id === DM.activeRecipientId ? 'selected' : ''}>${r.name || 'נמען ' + (DM.recipients.indexOf(r) + 1)}</option>`;
+                                }).join('')}
+                            </select>
+                            <span class="rcpt-color-dot" style="background:${rcptColor.fill};"></span>
+                        </div>
+                    `}
+                </div>
+                <div class="tools-grid">
+                    ${toolBtn('text', 'טקסט', 'T')}
+                    ${toolBtn('signature', 'חתימה', ICO.sign)}
+                    ${toolBtn('date_auto', 'תאריך אוטומטי', ICO.calendar)}
+                    ${toolBtn('date_manual', 'בחירת תאריך', ICO.calendar)}
+                    ${toolBtn('number', 'מספר', '#')}
+                    ${toolBtn('fullname', 'שם מלא', ICO.user)}
+                    ${toolBtn('id_number', 'ת.ז.', ICO.id)}
+                    ${toolBtn('checkbox', 'סימון', ICO.checkbox)}
+                    ${toolBtn('file', 'צירוף קובץ', ICO.doc)}
+                </div>
+            </div>
+            ${numPages > 1 ? `
+            <div class="panel-pages">
+                <div class="panel-pages-title">עמודים</div>
+                <div class="panel-pages-grid">
+                    ${DM.docPages.map((pg, i) => `
+                        <div class="panel-page-thumb ${DM._activePage === i + 1 ? 'active' : ''}" onclick="scrollToPage(${i + 1})">
+                            <img src="${pg}" draggable="false">
+                            <span>${i + 1}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>` : ''}
+            <div class="panel-footer-info">
+                שדות: ${DM.fields.length}
+                ${DM._pendingFieldType ? ' · <span style="color:var(--primary);font-weight:700;">לחץ על המסמך למיקום</span>' : ''}
+                ${DM._pendingFieldType ? `<br><button class="btn btn-ghost btn-sm" onclick="DM._pendingFieldType=null;DM._pendingFieldLabel=null;render();" style="margin-top:4px;font-size:0.8em;">Esc ביטול</button>` : ''}
+            </div>
         </div>
 
-        <!-- Center: Canvas -->
+        <!-- LEFT canvas (second in RTL flex) -->
         <div class="editor-canvas" onclick="deselectField(event)" id="canvasArea">
-            <!-- Zoom Controls -->
             <div class="zoom-controls">
                 <button class="zoom-btn" onclick="event.stopPropagation();zoomDoc(-0.15)" title="הקטן">−</button>
                 <span class="zoom-label">${zoomPct}%</span>
@@ -543,34 +916,7 @@ function renderFieldEditor(el) {
                 <div class="fields-layer" id="fieldsLayer">
                     ${DM.fields.map(f => renderFieldOnCanvas(f)).join('')}
                 </div>
-            </div>
-        </div>
-
-        <!-- Right: Tools -->
-        <div class="editor-tools">
-            <div class="tools-header">
-                ${DM.isTemplate ? `
-                    <div class="form-label" style="margin-bottom:6px;">סוג שדה</div>
-                    <div style="display:flex;gap:4px;margin-bottom:8px;">
-                        <button class="btn btn-sm ${!DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=false;" style="flex:1;">דינמי (למילוי)</button>
-                        <button class="btn btn-sm ${DM._fieldFixed ? 'btn-primary' : 'btn-outline'}" onclick="DM._fieldFixed=true;" style="flex:1;">קבוע (מוכן)</button>
-                    </div>
-                ` : `
-                    <div class="form-label" style="margin-bottom:6px;">הוסף שדה עבור</div>
-                    <select class="form-input" onchange="DM.activeRecipientId=Number(this.value)" style="font-weight:700;color:var(--primary);background:var(--primary-light);border-color:#93c5fd;">
-                        ${DM.recipients.map(r => `<option value="${r.id}" ${r.id === DM.activeRecipientId ? 'selected' : ''}>${r.name || 'נמען ' + (DM.recipients.indexOf(r) + 1)}</option>`).join('')}
-                    </select>`}
-            </div>
-            <div class="tools-grid">
-                ${toolBtn('text', 'טקסט', 'T')}
-                ${toolBtn('signature', 'חתימה', ICO.sign)}
-                ${toolBtn('date_auto', 'תאריך אוטומטי', ICO.calendar)}
-                ${toolBtn('date_manual', 'בחירת תאריך', ICO.calendar)}
-                ${toolBtn('number', 'מספר', '#')}
-                ${toolBtn('fullname', 'שם מלא', ICO.user)}
-                ${toolBtn('id_number', 'ת.ז.', ICO.id)}
-                ${toolBtn('checkbox', 'סימון', ICO.checkbox)}
-                ${toolBtn('file', 'צירוף קובץ', ICO.doc)}
+                ${pageBreakMarkers}
             </div>
         </div>
     </div>`;
@@ -583,10 +929,79 @@ function renderFieldEditor(el) {
         area.onmouseleave = handleMouseUp;
         area.ontouchmove = e => { if (DM.isDragging || DM.isResizing) { e.preventDefault(); handleMouseMove(e.touches[0]); } };
         area.ontouchend = handleMouseUp;
+        // Track active page on scroll
+        if (DM.docPages && DM.docPages.length > 1) {
+            area.onscroll = () => updateActivePage();
+        }
     }
     // Set cursor based on pending field mode
     const docCont = document.getElementById('docContainer');
     if (docCont) docCont.style.cursor = DM._pendingFieldType ? 'crosshair' : 'default';
+    // Setup drag-and-drop from tool buttons to canvas
+    setupCanvasDrop();
+}
+
+// ==================== PAGE NAVIGATION ====================
+function getPageYOffsets() {
+    if (!DM.pageHeights || !DM.pageHeights.length || !DM.pageWidth) return [];
+    const displayScale = 800 / DM.pageWidth;
+    const offsets = [];
+    let y = 0;
+    for (const h of DM.pageHeights) {
+        offsets.push(y);
+        y += h * displayScale;
+    }
+    return offsets;
+}
+
+function scrollToPage(pageNum) {
+    const area = document.getElementById('canvasArea');
+    if (!area) return;
+    const offsets = getPageYOffsets();
+    if (offsets.length === 0) return;
+    const idx = Math.max(0, Math.min(pageNum - 1, offsets.length - 1));
+    const zoom = DM._zoom || 1;
+    // Scroll to the page Y position (accounting for zoom + padding)
+    area.scrollTo({ top: offsets[idx] * zoom + 16, behavior: 'smooth' });
+    DM._activePage = pageNum;
+    // Update thumbnail highlights without full re-render
+    document.querySelectorAll('.page-thumb').forEach((thumb, i) => {
+        thumb.classList.toggle('active', i === idx);
+        const badge = thumb.querySelector('.page-badge');
+        if (i === idx && !badge) {
+            thumb.insertAdjacentHTML('beforeend', '<span class="page-badge">העמוד הנוכחי</span>');
+        } else if (i !== idx && badge) {
+            badge.remove();
+        }
+    });
+}
+
+function updateActivePage() {
+    const area = document.getElementById('canvasArea');
+    if (!area) return;
+    const offsets = getPageYOffsets();
+    if (offsets.length === 0) return;
+    const zoom = DM._zoom || 1;
+    const scrollY = area.scrollTop;
+    let activePage = 1;
+    for (let i = offsets.length - 1; i >= 0; i--) {
+        if (scrollY >= offsets[i] * zoom - 20) { activePage = i + 1; break; }
+    }
+    if (DM._activePage !== activePage) {
+        DM._activePage = activePage;
+        document.querySelectorAll('.page-thumb').forEach((thumb, i) => {
+            thumb.classList.toggle('active', i === activePage - 1);
+            const badge = thumb.querySelector('.page-badge');
+            if (i === activePage - 1 && !badge) {
+                thumb.insertAdjacentHTML('beforeend', '<span class="page-badge">העמוד הנוכחי</span>');
+            } else if (i !== activePage - 1 && badge) {
+                badge.remove();
+            }
+        });
+        // Scroll thumbnail into view in the sidebar
+        const activeThumb = document.querySelectorAll('.page-thumb')[activePage - 1];
+        if (activeThumb) activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function zoomDoc(delta, fit) {
@@ -603,9 +1018,54 @@ function zoomDoc(delta, fit) {
 }
 
 function toolBtn(type, label, icon) {
-    return `<button class="tool-btn" onclick="addField('${type}','${label}')">
+    return `<button class="tool-btn" draggable="true" onclick="addField('${type}','${label}')"
+        ondragstart="onToolDragStart(event,'${type}','${label}')">
         <span class="tool-icon">${icon}</span>${label}
     </button>`;
+}
+
+// ==================== DRAG FROM MENU TO CANVAS ====================
+function onToolDragStart(e, type, label) {
+    e.dataTransfer.setData('fieldType', type);
+    e.dataTransfer.setData('fieldLabel', label);
+    e.dataTransfer.effectAllowed = 'copy';
+}
+
+function setupCanvasDrop() {
+    const container = document.getElementById('docContainer');
+    if (!container) return;
+    container.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; container.style.outline = '2px dashed var(--primary)'; };
+    container.ondragleave = () => { container.style.outline = 'none'; };
+    container.ondrop = e => {
+        e.preventDefault();
+        container.style.outline = 'none';
+        const type = e.dataTransfer.getData('fieldType');
+        const label = e.dataTransfer.getData('fieldLabel');
+        if (!type) return;
+
+        const rect = container.getBoundingClientRect();
+        const zoom = DM._zoom || 1;
+        const dropX = (e.clientX - rect.left) / zoom;
+        const dropY = (e.clientY - rect.top) / zoom;
+
+        const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 26 : type === 'file' ? 140 : 120;
+        const defaultH = type === 'signature' ? 40 : type === 'checkbox' ? 26 : 28;
+        const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
+
+        const f = {
+            id: Date.now() + Math.random(),
+            type, label, value: '',
+            x: Math.max(0, dropX - defaultW / 2),
+            y: Math.max(0, dropY - defaultH / 2),
+            w: defaultW, h: defaultH,
+            required: true,
+            assigneeId: assignee ? assignee.id : null,
+            fixed: DM.isTemplate ? (DM._fieldFixed || false) : false
+        };
+        DM.fields.push(f);
+        DM.selectedFieldId = f.id;
+        render();
+    };
 }
 
 function onDocImageLoad() {
@@ -660,30 +1120,37 @@ function renderFieldProps(f) {
 // ==================== FIELD RENDERING ON CANVAS ====================
 function renderFieldOnCanvas(f) {
     const assignee = DM.recipients.find(r => r.id === f.assigneeId) || DM.recipients[0];
-    const ci = assignee ? assignee.colorIndex : (f.fixed ? 2 : 0);
+    const ci = f.fixed ? 3 : (assignee ? assignee.colorIndex : 2);
     const c = DM.fieldColors[ci % DM.fieldColors.length];
     const selected = DM.selectedFieldId === f.id;
-    const typeLabels = { signature: 'חתימה', date: 'תאריך', date_auto: 'תאריך אוטומטי', date_manual: 'בחירת תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓', file: 'צירוף קובץ' };
+    const typeLabels = { signature: 'חתימה', date: 'תאריך', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓', file: 'קובץ', text: 'שדה טקסט', number: 'מספר' };
+    const typeIcons = { signature: ICO.sign, file: ICO.doc, date_auto: ICO.calendar, date_manual: ICO.calendar, fullname: ICO.user, id_number: ICO.id, checkbox: ICO.checkbox };
     const displayText = f.value || typeLabels[f.type] || f.label || 'טקסט';
+    const fieldIcon = typeIcons[f.type] || '';
 
     return `<div class="field-box ${selected ? 'selected' : ''}" data-fid="${f.id}"
         style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;z-index:${selected ? 20 : 10};"
         onmousedown="fieldMouseDown(event,${f.id})" ontouchstart="fieldTouchStart(event,${f.id})"
         onclick="event.stopPropagation();selectField(${f.id})" ondblclick="event.stopPropagation();editFieldInline(${f.id})">
-        ${selected ? `
+        ${selected ? (() => {
+            const rcptName = assignee ? (assignee.name || 'נמען ' + (DM.recipients.indexOf(assignee) + 1)) : '';
+            return `
             <div class="field-label-tag" style="background:${c.fill};">${f.label}${f.required ? ' *' : ''}</div>
             <div class="field-toolbar">
-                <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">${ICO.edit}</button>
                 <button onclick="event.stopPropagation();deleteField(${f.id})" title="מחק">${ICO.trash}</button>
                 <button onclick="event.stopPropagation();duplicateField(${f.id})" title="שכפל">${ICO.copy}</button>
+                <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">${ICO.edit}</button>
+                <span class="toolbar-rcpt-badge" style="background:${c.fill};">${rcptName} <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.bg};margin-right:4px;vertical-align:middle;"></span></span>
             </div>
             <div class="resize-handle" style="top:-4px;left:-4px;border-color:${c.fill};cursor:nw-resize;" onmousedown="resizeMouseDown(event,${f.id},'nw')"></div>
             <div class="resize-handle" style="top:-4px;right:-4px;border-color:${c.fill};cursor:ne-resize;" onmousedown="resizeMouseDown(event,${f.id},'ne')"></div>
             <div class="resize-handle" style="bottom:-4px;left:-4px;border-color:${c.fill};cursor:sw-resize;" onmousedown="resizeMouseDown(event,${f.id},'sw')"></div>
             <div class="resize-handle" style="bottom:-4px;right:-4px;border-color:${c.fill};cursor:se-resize;" onmousedown="resizeMouseDown(event,${f.id},'se')"></div>
-        ` : ''}
-        <div class="field-inner" ${selected ? `style="background:${c.bg};border-color:${c.border};color:${c.text};"` : ''}>
-            <span style="padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${displayText}</span>
+        `; })() : ''}
+        <div class="field-inner" style="background:${c.bg};border-color:${c.border};color:${c.text};border-radius:20px;${selected ? 'border-width:2px;border-style:solid;' : 'border-width:1.5px;border-style:dashed;'}" ${f.required ? 'title="שדה חובה"' : ''}>
+            ${fieldIcon ? `<span class="field-type-icon" style="color:${c.fill};flex-shrink:0;margin-right:3px;display:flex;align-items:center;">${fieldIcon}</span>` : ''}
+            <span style="padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:0.78em;">${displayText}</span>
+            ${f.required ? `<span style="color:#dc2626;font-weight:800;font-size:1.1em;margin-right:2px;flex-shrink:0;">*</span>` : ''}
         </div>
     </div>`;
 }
@@ -695,17 +1162,21 @@ DM._pendingFieldType = null;
 DM._pendingFieldLabel = null;
 
 function addField(type, label) {
-    // Set pending - next click on document will place the field
     DM._pendingFieldType = type;
     DM._pendingFieldLabel = label;
-    // Change cursor to crosshair on canvas
+    DM._lastFieldType = type;
+    DM._lastFieldLabel = label;
     const container = document.getElementById('docContainer');
     if (container) container.style.cursor = 'crosshair';
-    toast('לחץ על המסמך למיקום השדה', 'info');
+    render();
 }
 
 function onCanvasClick(e) {
-    // If there's a pending field, place it at click position
+    // If no pending field type, use last used type (auto-repeat)
+    if (!DM._pendingFieldType && DM._lastFieldType) {
+        DM._pendingFieldType = DM._lastFieldType;
+        DM._pendingFieldLabel = DM._lastFieldLabel;
+    }
     if (!DM._pendingFieldType) return;
     // Don't place if clicking on an existing field
     if (e.target.closest && e.target.closest('.field-box')) return;
@@ -720,10 +1191,9 @@ function onCanvasClick(e) {
     const type = DM._pendingFieldType;
     const label = DM._pendingFieldLabel;
     const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
-    const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 30 : type === 'file' ? 160 : 140;
-    const defaultH = type === 'signature' ? 50 : type === 'checkbox' ? 30 : type === 'file' ? 50 : 32;
+    const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 26 : type === 'file' ? 140 : 120;
+    const defaultH = type === 'signature' ? 40 : type === 'checkbox' ? 26 : 28;
 
-    // Place field centered on click position
     const f = {
         id: Date.now() + Math.random(),
         type, label, value: '',
@@ -737,9 +1207,9 @@ function onCanvasClick(e) {
     DM.fields.push(f);
     DM.selectedFieldId = f.id;
 
-    // Clear pending
-    DM._pendingFieldType = null;
-    DM._pendingFieldLabel = null;
+    // Keep pending type for auto-repeat (user can Esc to stop)
+    DM._lastFieldType = type;
+    DM._lastFieldLabel = label;
 
     e.stopPropagation();
     render();
@@ -766,11 +1236,235 @@ function duplicateField(id) {
 function editFieldInline(id) {
     const f = DM.fields.find(x => x.id === id);
     if (!f) return;
-    if (f.type === 'date' || f.type === 'date_auto') { f.value = new Date().toLocaleDateString('he-IL'); render(); }
-    else if (f.type === 'date_manual') { const v = prompt('הזן תאריך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
-    else if (f.type === 'checkbox') { f.value = f.value ? '' : '✓'; render(); }
-    else if (f.type === 'file') { const v = prompt('הנחיה לחותם (סוג קובץ נדרש):', f.value || ''); if (v !== null) { f.value = v; render(); } }
-    else { const v = prompt(f.label || 'הזן ערך:', f.value || ''); if (v !== null) { f.value = v; render(); } }
+
+    // Checkbox - toggle immediately
+    if (f.type === 'checkbox') { f.value = f.value ? '' : '✓'; render(); return; }
+    // Date auto - set current date immediately
+    if (f.type === 'date' || f.type === 'date_auto') { f.value = new Date().toLocaleDateString('he-IL'); render(); return; }
+    // Signature - open signature canvas for drawing
+    if (f.type === 'signature') { openEditorSignature(id); return; }
+
+    // For all other types: show inline input inside the field on the canvas
+    const fieldEl = document.querySelector(`.field-box[data-fid="${id}"]`);
+    if (!fieldEl) return;
+
+    const inner = fieldEl.querySelector('.field-inner');
+    if (!inner) return;
+
+    if (f.type === 'date_manual') {
+        // Date picker input
+        inner.innerHTML = `<input type="date" class="inline-edit-input" value="${f.value || ''}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;cursor:text;">`;
+        const inp = inner.querySelector('input');
+        inp.focus();
+        inp.onchange = () => { f.value = inp.value ? new Date(inp.value).toLocaleDateString('he-IL') : ''; render(); };
+        inp.onblur = () => render();
+    } else {
+        // Text input for: text, number, fullname, id_number, file
+        const placeholder = f.type === 'file' ? 'סוג קובץ נדרש...' : f.label || 'הזן ערך...';
+        inner.innerHTML = `<input type="${f.type === 'number' ? 'number' : 'text'}" class="inline-edit-input" value="${f.value || ''}" placeholder="${placeholder}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;padding:0 4px;color:#1e293b;">`;
+        const inp = inner.querySelector('input');
+        inp.focus();
+        inp.select();
+        inp.onkeydown = e => {
+            if (e.key === 'Enter') { f.value = inp.value; render(); }
+            if (e.key === 'Escape') render();
+        };
+        inp.onblur = () => { f.value = inp.value; render(); };
+    }
+}
+
+// ==================== EDITOR SIGNATURE CANVAS ====================
+function openEditorSignature(fieldId) {
+    const f = DM.fields.find(x => x.id === fieldId);
+    if (!f) return;
+    window._editorSignActiveTab = 'draw';
+    window._editorSignUploadData = null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'editorSignModal';
+    overlay.innerHTML = `<div class="modal-card" style="width:500px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="font-weight:700;margin:0;">חתימה דיגיטלית</h3>
+            <button class="btn btn-ghost btn-sm" onclick="cancelEditorSignCanvas()" style="font-size:1.1em;">✕</button>
+        </div>
+        <div class="sign-tabs" style="display:flex;border-bottom:2px solid var(--border);margin-bottom:14px;">
+            <button class="sign-tab active" data-tab="draw" onclick="switchEditorSignTab('draw')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                ציור
+            </button>
+            <button class="sign-tab" data-tab="type" onclick="switchEditorSignTab('type')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                הקלדה
+            </button>
+            <button class="sign-tab" data-tab="upload" onclick="switchEditorSignTab('upload')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                העלאה
+            </button>
+        </div>
+        <div class="sign-tab-content" id="editorSignTabDraw">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
+            <canvas id="editorSignCanvas" class="sign-canvas" width="400" height="180"></canvas>
+            <button class="btn btn-ghost btn-sm" onclick="clearEditorSignCanvas()" style="margin-top:6px;font-size:0.78em;">נקה ציור</button>
+        </div>
+        <div class="sign-tab-content" id="editorSignTabType" style="display:none;">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">הקלד את שמך:</p>
+            <input type="text" id="editorSignNameInput" class="form-input" placeholder="השם המלא שלך" style="font-size:1.1em;padding:12px;text-align:center;margin-bottom:10px;" oninput="updateEditorSignNamePreview()">
+            <div style="font-size:0.78em;color:var(--text-light);margin-bottom:6px;">בחר סגנון:</div>
+            <div id="editorSignFontOptions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <button class="sign-font-btn active" data-font="'Segoe Script', 'Dancing Script', cursive" onclick="selectEditorSignFont(this)" style="font-family:'Segoe Script','Dancing Script',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Brush Script MT', 'Satisfy', cursive" onclick="selectEditorSignFont(this)" style="font-family:'Brush Script MT','Satisfy',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Comic Sans MS', 'Caveat', cursive" onclick="selectEditorSignFont(this)" style="font-family:'Comic Sans MS','Caveat',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Georgia', serif" onclick="selectEditorSignFont(this)" style="font-family:Georgia,serif;font-style:italic;">חתימה</button>
+            </div>
+            <div style="border:2px solid var(--border);border-radius:8px;background:white;min-height:80px;display:flex;align-items:center;justify-content:center;padding:12px;">
+                <span id="editorSignNamePreview" style="font-size:2em;color:#1e293b;font-family:'Segoe Script','Dancing Script',cursive;"></span>
+            </div>
+        </div>
+        <div class="sign-tab-content" id="editorSignTabUpload" style="display:none;">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">העלה תמונת חתימה:</p>
+            <div id="editorSignUploadArea" style="border:2px dashed var(--border);border-radius:8px;padding:30px;text-align:center;cursor:pointer;background:var(--bg);min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;" onclick="document.getElementById('editorSignUploadInput').click()">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style="font-size:0.85em;color:var(--text-light);margin-top:8px;">לחץ או גרור תמונה לכאן</span>
+                <input type="file" id="editorSignUploadInput" accept="image/*" style="display:none;" onchange="handleEditorSignUpload(event)">
+            </div>
+            <div id="editorSignUploadPreview" style="display:none;margin-top:10px;text-align:center;">
+                <img id="editorSignUploadImg" style="max-width:100%;max-height:150px;border:1px solid var(--border);border-radius:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="clearEditorSignUpload()" style="margin-top:6px;font-size:0.78em;">הסר תמונה</button>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="cancelEditorSignCanvas()">ביטול</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmEditorSignCanvas(${fieldId})">אשר חתימה</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+
+    const canvas = document.getElementById('editorSignCanvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    function pos(e) {
+        const r = canvas.getBoundingClientRect();
+        const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
+        const cy = (e.clientY || e.touches?.[0]?.clientY || 0) - r.top;
+        return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
+    }
+    canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+    canvas.onmousemove = canvas.ontouchmove = e => { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+    canvas.onmouseup = canvas.ontouchend = () => { drawing = false; };
+    canvas.onmouseleave = () => { drawing = false; };
+    window._editorSignCanvas = canvas;
+    window._editorSignFieldId = fieldId;
+
+    // Upload drag & drop
+    const uploadArea = document.getElementById('editorSignUploadArea');
+    if (uploadArea) {
+        uploadArea.ondragover = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--primary)'; };
+        uploadArea.ondragleave = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--border)'; };
+        uploadArea.ondrop = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--border)'; if (e.dataTransfer.files[0]) processEditorSignUploadFile(e.dataTransfer.files[0]); };
+    }
+}
+
+function switchEditorSignTab(tab) {
+    window._editorSignActiveTab = tab;
+    document.querySelectorAll('#editorSignModal .sign-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.getElementById('editorSignTabDraw').style.display = tab === 'draw' ? '' : 'none';
+    document.getElementById('editorSignTabType').style.display = tab === 'type' ? '' : 'none';
+    document.getElementById('editorSignTabUpload').style.display = tab === 'upload' ? '' : 'none';
+}
+
+function selectEditorSignFont(btn) {
+    document.querySelectorAll('#editorSignModal .sign-font-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    window._editorSignFont = btn.dataset.font;
+    updateEditorSignNamePreview();
+}
+
+function updateEditorSignNamePreview() {
+    const input = document.getElementById('editorSignNameInput');
+    const preview = document.getElementById('editorSignNamePreview');
+    if (input && preview) {
+        preview.textContent = input.value || '';
+        preview.style.fontFamily = window._editorSignFont || "'Segoe Script','Dancing Script',cursive";
+    }
+}
+
+function handleEditorSignUpload(e) { if (e.target.files[0]) processEditorSignUploadFile(e.target.files[0]); }
+function processEditorSignUploadFile(file) {
+    if (!file.type.startsWith('image/')) { toast('יש להעלות קובץ תמונה בלבד', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+        window._editorSignUploadData = ev.target.result;
+        const preview = document.getElementById('editorSignUploadPreview');
+        const img = document.getElementById('editorSignUploadImg');
+        const area = document.getElementById('editorSignUploadArea');
+        if (preview && img) { img.src = ev.target.result; preview.style.display = ''; }
+        if (area) area.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+function clearEditorSignUpload() {
+    window._editorSignUploadData = null;
+    const preview = document.getElementById('editorSignUploadPreview');
+    const area = document.getElementById('editorSignUploadArea');
+    if (preview) preview.style.display = 'none';
+    if (area) area.style.display = '';
+}
+
+function clearEditorSignCanvas() {
+    const c = window._editorSignCanvas;
+    if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+}
+
+function cancelEditorSignCanvas() {
+    const m = document.getElementById('editorSignModal');
+    if (m) m.remove();
+    delete window._editorSignCanvas;
+    delete window._editorSignFieldId;
+    window._editorSignUploadData = null;
+}
+
+function confirmEditorSignCanvas(fieldId) {
+    const tab = window._editorSignActiveTab || 'draw';
+    let signatureData = null;
+
+    if (tab === 'draw') {
+        const c = window._editorSignCanvas;
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        const pixels = ctx.getImageData(0, 0, c.width, c.height).data;
+        let hasContent = false;
+        for (let i = 3; i < pixels.length; i += 4) { if (pixels[i] > 0) { hasContent = true; break; } }
+        if (!hasContent) { toast('יש לצייר חתימה', 'error'); return; }
+        signatureData = c.toDataURL();
+    } else if (tab === 'type') {
+        const input = document.getElementById('editorSignNameInput');
+        const name = input ? input.value.trim() : '';
+        if (!name) { toast('יש להקליד שם', 'error'); return; }
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = 400; tmpCanvas.height = 120;
+        const ctx = tmpCanvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, 400, 120);
+        ctx.fillStyle = '#1e293b';
+        const font = window._editorSignFont || "'Segoe Script','Dancing Script',cursive";
+        ctx.font = `36px ${font}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(name, 200, 60, 380);
+        signatureData = tmpCanvas.toDataURL();
+    } else if (tab === 'upload') {
+        if (!window._editorSignUploadData) { toast('יש להעלות תמונת חתימה', 'error'); return; }
+        signatureData = window._editorSignUploadData;
+    }
+
+    const f = DM.fields.find(x => x.id === fieldId);
+    if (f && signatureData) {
+        f.value = 'חתום';
+        f.signatureData = signatureData;
+    }
+    cancelEditorSignCanvas();
+    render();
 }
 
 // ==================== DRAG & RESIZE ====================
@@ -853,40 +1547,39 @@ function handleMouseUp() {
 }
 
 // ==================== STEP 4: SEND ====================
+if (!DM._sendCopyMethod) DM._sendCopyMethod = 'none';
+if (!DM._sendInstructions) DM._sendInstructions = '';
+if (!DM._showInstructions) DM._showInstructions = false;
+
 function renderSend(el) {
     el.innerHTML = `<div class="send-area">
         <h2 style="font-size:1.3em;font-weight:700;margin-bottom:20px;">הכנה לשליחה</h2>
         <div class="send-grid">
-            <div>
-                <div class="send-card">
-                    <h3 style="font-weight:700;font-size:0.9em;margin-bottom:12px;">סיכום</h3>
-                    <div style="font-size:0.85em;color:var(--text-light);display:flex;flex-direction:column;gap:8px;">
-                        <div style="display:flex;justify-content:space-between;"><span>מסמך:</span><strong style="color:var(--text);">${DM.fileName || 'ללא שם'}</strong></div>
-                        <div style="display:flex;justify-content:space-between;"><span>נמענים:</span><strong style="color:var(--text);">${DM.recipients.length}</strong></div>
-                        <div style="display:flex;justify-content:space-between;"><span>שדות:</span><strong style="color:var(--text);">${DM.fields.length}</strong></div>
-                    </div>
-                </div>
-            </div>
+            <!-- Right: Document details -->
             <div class="send-card">
                 <div class="form-group">
                     <label class="form-label">שם המסמך</label>
                     <input type="text" class="form-input" value="${DM.fileName || 'מסמך ללא שם'}" onchange="DM.fileName=this.value" style="font-weight:600;">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">הודעה לחותמים</label>
-                    <textarea class="form-input" rows="3" placeholder="הזן הודעה שתישלח לנמענים..." id="sendMessage" style="resize:none;"></textarea>
+                    <label class="form-label">הודעה לחותם בשליחת דוא"ל</label>
+                    <textarea class="form-input" rows="3" placeholder="הזן הודעה..." id="sendMessage" style="resize:none;"></textarea>
                 </div>
+                ${DM._showInstructions ? `
                 <div class="form-group">
-                    <label class="form-label">תאריך תפוגה (אופציונלי)</label>
-                    <input type="date" class="form-input" id="docExpiry" style="direction:ltr;text-align:right;">
-                </div>
-                <div>
+                    <label class="form-label">הנחיות למילוי</label>
+                    <textarea class="form-input" rows="2" placeholder="הזן הנחיות למילוי המסמך..." id="sendInstructions" style="resize:none;" onchange="DM._sendInstructions=this.value">${DM._sendInstructions}</textarea>
+                </div>` : `
+                <div style="text-align:left;">
+                    <button class="btn-link" onclick="DM._showInstructions=true;render();" style="font-size:0.82em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">+ הוסף הנחיות למילוי</button>
+                </div>`}
+                <div style="margin-top:12px;">
                     <label class="form-label" style="margin-bottom:8px;">נמענים:</label>
                     ${DM.recipients.map(r => {
                         const c = DM.fieldColors[r.colorIndex % DM.fieldColors.length];
                         const fc = DM.fields.filter(f => f.assigneeId === r.id).length;
                         return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:6px;">
-                            <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
+                            <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};flex-shrink:0;"></span>
                             <span style="font-weight:600;font-size:0.88em;">${r.name || 'ללא שם'}</span>
                             <span style="font-size:0.78em;color:var(--text-light);direction:ltr;">${r.phone || ''}</span>
                             <span style="margin-right:auto;font-size:0.72em;background:var(--card);padding:2px 8px;border-radius:10px;">${fc} שדות</span>
@@ -894,8 +1587,126 @@ function renderSend(el) {
                     }).join('')}
                 </div>
             </div>
+
+            <!-- Left: Additional options -->
+            <div>
+                <div class="send-card">
+                    <h3 style="font-weight:700;font-size:0.9em;margin-bottom:14px;">אפשרויות נוספות</h3>
+                    <div class="form-group">
+                        <label class="form-label">שליחת העתק לנמען</label>
+                        <select class="form-input" onchange="DM._sendCopyMethod=this.value" style="font-size:0.88em;">
+                            <option value="none" ${DM._sendCopyMethod === 'none' ? 'selected' : ''}>אל תשלח עותק לנמען</option>
+                            <option value="email" ${DM._sendCopyMethod === 'email' ? 'selected' : ''}>שלח העתק בדוא"ל בסיום המילוי</option>
+                            <option value="whatsapp" ${DM._sendCopyMethod === 'whatsapp' ? 'selected' : ''}>שלח העתק של המסמך החתום בוואצאפ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">תאריך תפוגה (אופציונלי)</label>
+                        <input type="date" class="form-input" id="docExpiry" style="direction:ltr;text-align:right;">
+                    </div>
+                </div>
+                <div style="margin-top:12px;text-align:center;">
+                    <button class="btn-link" onclick="createLinkOnly()" style="font-size:0.85em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">צור קישור ללא שליחה</button>
+                </div>
+            </div>
         </div>
     </div>`;
+}
+
+function createLinkOnly() {
+    if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    const now = new Date().toISOString();
+    const doc = {
+        id: 'dm_' + Date.now(),
+        fileName: DM.fileName || 'מסמך ללא שם',
+        docImage: DM.docImage,
+        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
+        pageHeights: DM.pageHeights || [],
+        pageWidth: DM.pageWidth || 0,
+        recipients: JSON.parse(JSON.stringify(DM.recipients)),
+        fields: JSON.parse(JSON.stringify(DM.fields)),
+        status: 'sent',
+        createdAt: now,
+        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
+        audit: [{ action: 'created', time: now, detail: 'המסמך נוצר (קישור ללא שליחה)' }]
+    };
+    DM.docs.push(doc);
+    save();
+    if (typeof firebaseSaveDoc === 'function') {
+        firebaseSaveDoc(doc).then(ok => { if (ok) console.log('Document saved to Firebase'); });
+    }
+    showLinkSuccess(doc);
+}
+
+function showLinkSuccess(doc) {
+    const baseUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+    const main = document.getElementById('mainContent');
+    main.innerHTML = `<div class="link-success-screen">
+        <button class="close-btn" onclick="resetEditor();DM.view='home';render();" style="position:absolute;top:16px;left:16px;background:none;border:none;font-size:1.5em;cursor:pointer;color:var(--text-light);">✕</button>
+        <div class="link-success-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#16a34a"/><polyline points="7 12 10 15 17 9" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 style="font-size:1.5em;font-weight:800;margin:16px 0 6px;">המסמך מוכן לחתימה!</h2>
+        <p style="color:var(--text-light);font-size:0.9em;margin-bottom:24px;">עדכון ישלח אליך כאשר המסמך יחתם</p>
+        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">נתיב מסמך:</div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px;">
+            ${doc.recipients.map((r, i) => {
+                const signUrl = baseUrl;
+                return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg);border-radius:10px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-weight:700;color:var(--primary);font-size:0.9em;">${i + 1}</span>
+                        <span style="font-weight:600;">${r.name || 'נמען ' + (i + 1)}</span>
+                    </div>
+                    <button class="btn btn-sm" onclick="copySignLink(this,'${signUrl}')" style="background:var(--primary-light);color:var(--primary);border:1px solid #93c5fd;display:flex;align-items:center;gap:6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        העתק קישור
+                    </button>
+                </div>`;
+            }).join('')}
+        </div>
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
+            <h3 style="font-weight:700;margin-bottom:6px;">צור תבנית</h3>
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">שלחת מסמך שאינו תבנית. חסוך זמן בפעם הבאה על ידי יצירת תבנית ממנו.</p>
+            <button class="btn btn-outline" onclick="saveAsTemplateFromDoc('${doc.id}')">שמור כתבנית</button>
+        </div>
+        <div style="margin-top:20px;">
+            <button class="btn btn-primary" onclick="resetEditor();DM.view='home';render();">חזור לראשי</button>
+        </div>
+    </div>`;
+}
+
+function copySignLink(btn, url) {
+    navigator.clipboard.writeText(url).then(() => {
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> הועתק!';
+        btn.style.background = '#dcfce7';
+        btn.style.color = '#16a34a';
+        btn.style.borderColor = '#16a34a';
+        setTimeout(() => {
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> העתק קישור';
+            btn.style.background = 'var(--primary-light)';
+            btn.style.color = 'var(--primary)';
+            btn.style.borderColor = '#93c5fd';
+        }, 2000);
+    });
+}
+
+function saveAsTemplateFromDoc(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+    const tpl = {
+        id: 'tpl_' + Date.now(),
+        fileName: doc.fileName,
+        docImage: doc.docImage,
+        docPages: doc.docPages || [],
+        pageHeights: doc.pageHeights || [],
+        pageWidth: doc.pageWidth || 0,
+        recipients: JSON.parse(JSON.stringify(doc.recipients)),
+        fields: JSON.parse(JSON.stringify(doc.fields)),
+        createdAt: new Date().toISOString()
+    };
+    DM.templates.push(tpl);
+    save();
+    toast('התבנית נשמרה בהצלחה!');
 }
 
 // ==================== SEND DOCUMENT ====================
@@ -947,7 +1758,7 @@ function sendDocument() {
 
     toast('המסמך נשלח בהצלחה!');
     resetEditor();
-    DM.view = 'dashboard';
+    DM.view = 'home';
     render();
 }
 
@@ -985,7 +1796,7 @@ function saveTemplate() {
 function openSign(docId) {
     DM.signDocId = docId;
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('dashboard'); return; }
+    if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
 
     const isSignLink = location.hash.startsWith('#sign/');
     const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
@@ -1053,48 +1864,87 @@ function verifySigner(docId) {
     render();
 }
 
+// Track current field index for guided navigation
+if (!DM._signFieldIdx) DM._signFieldIdx = -1;
+
 function renderSignView(el) {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
-    if (!doc) { switchView('dashboard'); return; }
+    if (!doc) { switchView('home'); return; }
 
-    // Determine if this is a signer view (came via link) or sender/owner view
     const isSignerView = !!DM._currentSigner;
-    // Match signer to a recipient by name
     let signerRecipient = null;
     if (isSignerView) {
         signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
     }
 
-    // Add view audit on first render
     if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', isSignerView ? `${DM._currentSigner} צפה במסמך` : 'המסמך נצפה'); save(); syncDocToFirebase(doc); }
 
     const isComplete = doc.status === 'completed';
     const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date();
 
-    // For signer view: only count their fields; for sender view: count all
     const myFields = isSignerView && signerRecipient
         ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
         : (doc.fields || []).filter(f => !f.fixed);
     const mySignedFields = myFields.filter(f => f.signedValue).length;
     const pct = myFields.length > 0 ? Math.round((mySignedFields / myFields.length) * 100) : 0;
     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+    const hasFieldsToFill = myFields.length > 0;
+    const allFilled = pct === 100;
+
+    // Determine button text based on state
+    let mainBtnText, mainBtnAction;
+    if (isComplete) {
+        mainBtnText = ''; mainBtnAction = '';
+    } else if (!hasFieldsToFill) {
+        mainBtnText = 'אישור קריאה';
+        mainBtnAction = `completeSign('${doc.id}')`;
+    } else if (DM._signFieldIdx === -1) {
+        mainBtnText = 'התחל';
+        mainBtnAction = `navigateSignField('${doc.id}', 'next')`;
+    } else if (allFilled) {
+        mainBtnText = 'סיום';
+        mainBtnAction = `completeSign('${doc.id}')`;
+    } else {
+        mainBtnText = 'הבא';
+        mainBtnAction = `navigateSignField('${doc.id}', 'next')`;
+    }
+
+    // Page info
+    const hasPages = doc.docPages && doc.docPages.length > 1;
+    const numPages = hasPages ? doc.docPages.length : (doc.docImage ? 1 : 0);
 
     el.innerHTML = `<div class="wizard">
+        <!-- Sign Header -->
         <div class="sign-header">
-            <button class="btn btn-ghost" onclick="switchView('dashboard')">← ${isSignerView ? 'יציאה' : 'חזרה'}</button>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <h3 style="font-weight:700;">${doc.fileName || 'מסמך'}</h3>
-                ${isComplete ? '<span class="badge badge-success">הושלם</span>' : isExpired ? '<span class="badge badge-danger">פג תוקף</span>' : '<span class="badge badge-warning">ממתין לחתימה</span>'}
+            <div class="sign-header-actions">
+                ${mainBtnText ? `<button class="btn btn-primary btn-lg sign-main-btn" onclick="${mainBtnAction}">${mainBtnText}</button>` : ''}
+                ${DM._signFieldIdx > 0 ? `<button class="btn btn-ghost" onclick="navigateSignField('${doc.id}','prev')" style="font-size:0.88em;">הקודם</button>` : ''}
             </div>
-            <div style="display:flex;gap:6px;">
-                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד PDF">${ICO.download} PDF</button>
-                ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog('${doc.id}')" title="יומן פעילות">${ICO.log}</button>` : ''}
+            <div class="sign-header-tools">
+                ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog()" title="יומן">${ICO.log}</button>` : ''}
+                <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד">${ICO.download}</button>
+                ${isSignerView ? `
+                    <span class="sign-header-link" onclick="exitAndSave('${doc.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        <span class="hide-xs">צא ושמור</span>
+                    </span>
+                    <span class="sign-header-link sign-header-link-danger" onclick="refuseSign('${doc.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        <span class="hide-xs">סירוב חתימה</span>
+                    </span>
+                ` : `
+                    <button class="btn btn-ghost btn-sm" onclick="switchView('home')">✕</button>
+                `}
             </div>
         </div>
+        <!-- Doc name + page info -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 20px;background:var(--bg);border-bottom:1px solid var(--border);font-size:0.85em;">
+            <span style="color:var(--text-light);">עמוד ${DM._signActivePage || 1} מתוך ${numPages || 1}</span>
+            <span style="font-weight:700;">${doc.fileName || 'מסמך'}</span>
+        </div>
         <!-- Progress bar -->
-        <div class="sign-progress">
-            <div class="sign-progress-fill" style="width:${pct}%;"></div>
-            <span class="sign-progress-label">${isSignerView ? `${mySignedFields}/${myFields.length} שדות מולאו (${pct}%)` : `${mySignedFields}/${myFields.length} שדות מולאו (${pct}%)`}</span>
+        <div class="sign-progress" style="height:4px;">
+            <div class="sign-progress-fill" style="width:${pct}%;background:#2dd4a8;"></div>
         </div>
         ${isComplete ? `
         <div class="completion-banner">
@@ -1105,7 +1955,7 @@ function renderSignView(el) {
             </div>
         </div>` : ''}
         ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
-        ${!isSignerView ? `<!-- Audit Log Panel (hidden by default) -->
+        ${!isSignerView ? `
         <div class="audit-panel hidden" id="auditPanel">
             <div class="audit-header">
                 <strong>יומן פעילות</strong>
@@ -1133,42 +1983,27 @@ function renderSignView(el) {
                         const ci = assignee ? assignee.colorIndex : 0;
                         const c = DM.fieldColors[ci % DM.fieldColors.length];
                         const val = f.signedValue || f.value || '';
-                        // In signer view: only allow signing own fields
                         const isMyField = !isSignerView || !signerRecipient || f.assigneeId === signerRecipient.id;
                         const canSign = !val && !f.fixed && !isComplete && !isExpired && isMyField;
-                        // In signer view: hide other people's unsigned empty fields
                         const showField = isMyField || val || f.fixed;
                         if (!showField) return '';
-                        return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;
+                        const typeLabels = { signature: 'שדה חתימה', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'תעודת זהות', text: 'שדה טקסט', number: 'מספר', file: 'קובץ', checkbox: '☐' };
+                        return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;border-radius:20px;
                             ${val ? `background:${c.bg};border:1.5px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
-                            ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}>
+                            ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}
+                            ${f.required && canSign ? 'title="שדה חובה"' : ''}>
                             ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
                               f.fileData ? `<img src="${f.fileData}" style="width:100%;height:100%;object-fit:contain;" alt="קובץ מצורף">` :
                               val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;">${val}</span>` :
-                              canSign && f.type === 'file' ? `<span style="font-size:0.75em;color:${c.text};font-weight:700;">📎 ${f.value || 'לחץ לצרף קובץ'}</span>` :
-                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">לחץ למלא</span>` :
+                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">${typeLabels[f.type] || f.label}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
                               f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;">${f.value}</span>` :
                               `<span style="font-size:0.75em;color:#888;font-weight:600;">${f.label}</span>`}
                         </div>`;
                     }).join('')}
                 </div>
             </div>
-            <div class="sign-sidebar">
-                ${isSignerView ? `
-                    <!-- Signer view: compact progress + confirm -->
-                    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
-                        <div style="flex:1;">
-                            <div style="font-size:0.82em;color:var(--text-light);">שלום, ${DM._currentSigner}</div>
-                            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-                                <div class="mini-progress" style="flex:1;height:6px;"><div class="mini-progress-fill" style="width:${pct}%;background:var(--primary);"></div></div>
-                                <span style="font-size:0.82em;font-weight:700;color:var(--primary);">${mySignedFields}/${myFields.length}</span>
-                            </div>
-                        </div>
-                        ${!isComplete && !isExpired && pct === 100 ? `<button class="btn btn-success btn-sm" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
-                        ${!isComplete && !isExpired && pct < 100 ? `<span style="font-size:0.75em;color:var(--warning);font-weight:600;">לחץ על השדות במסמך</span>` : ''}
-                    </div>
-                    ${isComplete ? `<div style="text-align:center;color:var(--success);font-weight:700;padding:8px;">המסמך נחתם בהצלחה!</div>` : ''}
-                ` : `
+            ${!isSignerView ? `<div class="sign-sidebar">` : '<div class="sign-sidebar" style="display:none;">'}
+                ${isSignerView ? `` : `
                     <!-- Sender/owner view: show all recipients -->
                     <h3 style="font-weight:700;font-size:0.95em;margin-bottom:14px;">נמענים (${(doc.recipients || []).filter(r => r.signed).length}/${(doc.recipients || []).length})</h3>
                     ${(doc.recipients || []).map(r => {
@@ -1254,6 +2089,97 @@ function toggleAuditLog() {
     if (panel) panel.classList.toggle('hidden');
 }
 
+// ==================== GUIDED FIELD NAVIGATION ====================
+function navigateSignField(docId, direction) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+
+    const isSignerView = !!DM._currentSigner;
+    let signerRecipient = null;
+    if (isSignerView) {
+        signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
+    }
+
+    // Get fillable fields for current user
+    const fillableFields = (doc.fields || []).filter(f => {
+        if (f.fixed) return false;
+        if (isSignerView && signerRecipient && f.assigneeId !== signerRecipient.id) return false;
+        return !f.signedValue;
+    });
+
+    if (fillableFields.length === 0) return;
+
+    if (direction === 'next') {
+        DM._signFieldIdx = Math.min((DM._signFieldIdx || 0) + 1, fillableFields.length - 1);
+        if (DM._signFieldIdx < 0) DM._signFieldIdx = 0;
+    } else {
+        DM._signFieldIdx = Math.max((DM._signFieldIdx || 0) - 1, 0);
+    }
+
+    const targetField = fillableFields[DM._signFieldIdx];
+    if (targetField) {
+        highlightNextFieldById(targetField.id);
+    }
+    // Update button text without full re-render
+    render();
+}
+
+function exitAndSave(docId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'exitSaveModal';
+    overlay.innerHTML = `<div class="modal-card" style="text-align:center;max-width:440px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('exitSaveModal').remove()" style="position:absolute;top:12px;left:12px;font-size:1.1em;">✕</button>
+        <div style="margin:10px 0 16px;">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+        </div>
+        <h3 style="font-weight:700;margin-bottom:10px;font-size:1.15em;">טופס מולא חלקית</h3>
+        <p style="font-size:0.88em;color:var(--text-light);line-height:1.6;margin-bottom:20px;">
+            יציאה מתהליך המילוי תשמור את המידע והנתונים שהזנת. שים לב, ניתן לחזור ולמלא את שארית המסמך באמצעות הקישור המקורי בו השתמשת.
+        </p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+            <button class="btn btn-outline" onclick="document.getElementById('exitSaveModal').remove()">ביטול</button>
+            <button class="btn btn-primary" onclick="document.getElementById('exitSaveModal').remove();toast('המסמך נשמר.');switchView('home');">צא ושמור טופס</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+function refuseSign(docId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'refuseSignModal';
+    overlay.innerHTML = `<div class="modal-card" style="max-width:460px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('refuseSignModal').remove()" style="position:absolute;top:12px;left:12px;font-size:1.1em;">✕</button>
+        <h3 style="font-weight:700;margin-bottom:10px;font-size:1.15em;">סירוב לחתימה על מסמך</h3>
+        <p style="font-size:0.88em;color:var(--text-light);margin-bottom:14px;">מדוע אינך מעוניין לחתום על המסמך?</p>
+        <textarea id="refuseReasonInput" class="form-input" rows="4" placeholder="כתוב סיבה קצרה" style="resize:vertical;margin-bottom:16px;"></textarea>
+        <div style="display:flex;justify-content:center;">
+            <button class="btn" style="background:#f87171;color:white;border:none;min-width:120px;padding:10px 24px;" onclick="confirmRefuseSign('${docId}')">שלח</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+function confirmRefuseSign(docId) {
+    const reason = (document.getElementById('refuseReasonInput') || {}).value || '';
+    const doc = DM.docs.find(d => d.id === docId);
+    if (doc) {
+        const detail = reason.trim()
+            ? `${DM._currentSigner || 'נמען'} סירב לחתום. סיבה: ${reason.trim()}`
+            : `${DM._currentSigner || 'נמען'} סירב לחתום`;
+        addAudit(doc, 'refused', detail);
+        save();
+        syncDocToFirebase(doc);
+    }
+    const modal = document.getElementById('refuseSignModal');
+    if (modal) modal.remove();
+    toast('סירוב החתימה נרשם.');
+    switchView('home');
+}
+
 function sendReminder(docId, recipientId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) return;
@@ -1313,10 +2239,41 @@ async function downloadSignedPDF(docId) {
             });
         }
 
+        // Helper: safely save PDF with fallback
+        function safePdfSave(pdf, fileName) {
+            const name = `${fileName || 'signed-document'}.pdf`;
+            try {
+                pdf.save(name);
+            } catch (saveErr) {
+                console.warn('pdf.save() failed, using blob fallback:', saveErr);
+                const blob = pdf.output('blob');
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }
+        }
+
+        // Helper: limit canvas size to avoid browser limits
+        function limitedCanvas(srcImg, maxDim) {
+            maxDim = maxDim || 2000;
+            const w = srcImg.width, h = srcImg.height;
+            if (w <= maxDim && h <= maxDim) return { canvas: null, scale: 1 };
+            const ratio = Math.min(maxDim / w, maxDim / h);
+            const c = document.createElement('canvas');
+            c.width = Math.round(w * ratio);
+            c.height = Math.round(h * ratio);
+            c.getContext('2d').drawImage(srcImg, 0, 0, c.width, c.height);
+            return { canvas: c, scale: ratio };
+        }
+
         // Check if jsPDF is available
         const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
         if (!jsPDF) {
-            // Fallback to PNG if jsPDF not loaded
             console.warn('jsPDF not available, falling back to PNG');
             await downloadAsPNG(doc, sigImages, fileImages);
             return;
@@ -1324,7 +2281,7 @@ async function downloadSignedPDF(docId) {
 
         const mainImg = await loadImage(doc.docImage);
         const imgW = mainImg.width;
-        const scale = imgW / 800;
+        const editorScale = imgW / 800; // fields are positioned on 800px-wide editor
 
         // Determine if we have multi-page info
         const hasPages = doc.docPages && doc.docPages.length > 1 && doc.pageHeights && doc.pageHeights.length > 1;
@@ -1336,7 +2293,7 @@ async function downloadSignedPDF(docId) {
                 pageImgs.push(await loadImage(pgSrc));
             }
 
-            // Create PDF with first page dimensions
+            // Create PDF with first page dimensions (use A4 px equivalent for better compatibility)
             const firstPage = pageImgs[0];
             const pdfW = firstPage.width;
             const pdfH = firstPage.height;
@@ -1359,14 +2316,14 @@ async function downloadSignedPDF(docId) {
                 pgCtx.drawImage(pgImg, 0, 0);
 
                 // Draw fields for this page
-                drawFields(pgCtx, scale, yOffset, pgH);
+                drawFields(pgCtx, editorScale, yOffset, pgH);
 
                 // Add watermark if completed
                 if (doc.status === 'completed') {
                     pgCtx.save();
                     pgCtx.globalAlpha = 0.06;
                     pgCtx.fillStyle = '#16a34a';
-                    pgCtx.font = `bold ${60 * scale}px Arial`;
+                    pgCtx.font = `bold ${60 * editorScale}px Arial`;
                     pgCtx.translate(pgW / 2, pgH / 2);
                     pgCtx.rotate(-Math.PI / 6);
                     pgCtx.textAlign = 'center';
@@ -1379,24 +2336,29 @@ async function downloadSignedPDF(docId) {
                 yOffset += pgH;
             }
 
-            pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+            safePdfSave(pdf, doc.fileName);
         } else {
             // Single page or legacy document (no page info)
-            const canvas = document.createElement('canvas');
-            canvas.width = mainImg.width;
-            canvas.height = mainImg.height;
+            // Limit canvas size for browser compatibility
+            const limited = limitedCanvas(mainImg, 3000);
+            const canvas = limited.canvas || document.createElement('canvas');
+            if (!limited.canvas) {
+                canvas.width = mainImg.width;
+                canvas.height = mainImg.height;
+                canvas.getContext('2d').drawImage(mainImg, 0, 0);
+            }
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(mainImg, 0, 0);
+            const exportScale = editorScale * limited.scale;
 
             // Draw all fields
-            drawFields(ctx, scale, 0, canvas.height);
+            drawFields(ctx, exportScale, 0, canvas.height);
 
             // Watermark
             if (doc.status === 'completed') {
                 ctx.save();
                 ctx.globalAlpha = 0.06;
                 ctx.fillStyle = '#16a34a';
-                ctx.font = `bold ${60 * scale}px Arial`;
+                ctx.font = `bold ${60 * exportScale}px Arial`;
                 ctx.translate(canvas.width / 2, canvas.height / 2);
                 ctx.rotate(-Math.PI / 6);
                 ctx.textAlign = 'center';
@@ -1409,13 +2371,13 @@ async function downloadSignedPDF(docId) {
             const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], compress: true });
             const imgData = canvas.toDataURL('image/jpeg', 0.92);
             pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+            safePdfSave(pdf, doc.fileName);
         }
 
         toast('ה-PDF הורד בהצלחה!');
     } catch (err) {
         console.error('Download error:', err);
-        toast('שגיאה בהורדת הקובץ', 'error');
+        toast('שגיאה בהורדת הקובץ: ' + (err.message || 'נסה שוב'), 'error');
     }
 }
 
@@ -1469,7 +2431,9 @@ async function downloadAsPNG(doc, sigImages, fileImages) {
 function loadImage(src) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (src && !src.startsWith('data:')) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => resolve(img);
         img.onerror = () => reject(new Error('Image load failed'));
         img.src = src;
@@ -1509,12 +2473,32 @@ function signField(docId, fieldId) {
         addAudit(doc, 'field_signed', `שדה "${field.label}" סומן`);
         save(); syncDocToFirebase(doc); render();
     } else {
-        const val = prompt(field.label || 'הזן ערך:');
-        if (val !== null && val.trim()) {
-            field.signedValue = val.trim();
-            addAudit(doc, 'field_signed', `שדה "${field.label}" מולא`);
-            save(); syncDocToFirebase(doc); render();
-        }
+        // Inline editing inside the field on the document
+        const fieldEl = document.querySelector(`.sign-field[data-fid="${fieldId}"]`);
+        if (!fieldEl) return;
+        fieldEl.onclick = null; // prevent re-triggering
+        fieldEl.style.zIndex = '100';
+        fieldEl.style.borderStyle = 'solid';
+        const inputType = field.type === 'number' ? 'number' : 'text';
+        fieldEl.innerHTML = `<input type="${inputType}" class="sign-inline-input" placeholder="${field.label || 'הזן ערך...'}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:700;text-align:center;outline:none;padding:0 6px;color:#1e293b;direction:rtl;">`;
+        const inp = fieldEl.querySelector('input');
+        inp.focus();
+        const commitValue = () => {
+            const val = inp.value.trim();
+            if (val) {
+                field.signedValue = val;
+                addAudit(doc, 'field_signed', `שדה "${field.label}" מולא`);
+                save(); syncDocToFirebase(doc);
+            }
+            render();
+            highlightNextField(doc);
+        };
+        inp.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); commitValue(); }
+            if (e.key === 'Escape') render();
+        });
+        inp.addEventListener('blur', commitValue);
+        return; // don't call highlightNextField yet - wait for commit
     }
     // Move to next unsigned field
     highlightNextField(doc);
@@ -1527,21 +2511,74 @@ function syncDocToFirebase(doc) {
 }
 
 function openSignatureCanvas(docId, fieldId) {
+    window._signActiveTab = 'draw';
+    window._signUploadData = null;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'signModal';
-    overlay.innerHTML = `<div class="modal-card">
-        <h3 style="font-weight:700;margin-bottom:12px;">חתימה דיגיטלית</h3>
-        <p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">חתום בתוך המסגרת:</p>
-        <canvas id="signCanvas" class="sign-canvas" width="400" height="180"></canvas>
+    overlay.innerHTML = `<div class="modal-card" style="width:500px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="font-weight:700;margin:0;">חתימה דיגיטלית</h3>
+            <button class="btn btn-ghost btn-sm" onclick="cancelSignCanvas()" style="font-size:1.1em;">✕</button>
+        </div>
+        <!-- Tabs -->
+        <div class="sign-tabs" style="display:flex;border-bottom:2px solid var(--border);margin-bottom:14px;">
+            <button class="sign-tab active" data-tab="draw" onclick="switchSignTab('draw')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                ציור
+            </button>
+            <button class="sign-tab" data-tab="type" onclick="switchSignTab('type')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                הקלדה
+            </button>
+            <button class="sign-tab" data-tab="upload" onclick="switchSignTab('upload')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                העלאה
+            </button>
+        </div>
+        <!-- Tab: Draw -->
+        <div class="sign-tab-content" id="signTabDraw">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
+            <canvas id="signCanvas" class="sign-canvas" width="400" height="180"></canvas>
+            <button class="btn btn-ghost btn-sm" onclick="clearSignCanvas()" style="margin-top:6px;font-size:0.78em;">נקה ציור</button>
+        </div>
+        <!-- Tab: Type name -->
+        <div class="sign-tab-content" id="signTabType" style="display:none;">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">הקלד את שמך:</p>
+            <input type="text" id="signNameInput" class="form-input" placeholder="השם המלא שלך" style="font-size:1.1em;padding:12px;text-align:center;margin-bottom:10px;" oninput="updateSignNamePreview()">
+            <div style="font-size:0.78em;color:var(--text-light);margin-bottom:6px;">בחר סגנון:</div>
+            <div id="signFontOptions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <button class="sign-font-btn active" data-font="'Segoe Script', 'Dancing Script', cursive" onclick="selectSignFont(this)" style="font-family:'Segoe Script','Dancing Script',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Brush Script MT', 'Satisfy', cursive" onclick="selectSignFont(this)" style="font-family:'Brush Script MT','Satisfy',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Comic Sans MS', 'Caveat', cursive" onclick="selectSignFont(this)" style="font-family:'Comic Sans MS','Caveat',cursive;">חתימה</button>
+                <button class="sign-font-btn" data-font="'Georgia', serif" onclick="selectSignFont(this)" style="font-family:Georgia,serif;font-style:italic;">חתימה</button>
+            </div>
+            <div style="border:2px solid var(--border);border-radius:8px;background:white;min-height:80px;display:flex;align-items:center;justify-content:center;padding:12px;">
+                <span id="signNamePreview" style="font-size:2em;color:#1e293b;font-family:'Segoe Script','Dancing Script',cursive;"></span>
+            </div>
+        </div>
+        <!-- Tab: Upload -->
+        <div class="sign-tab-content" id="signTabUpload" style="display:none;">
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">העלה תמונת חתימה:</p>
+            <div id="signUploadArea" style="border:2px dashed var(--border);border-radius:8px;padding:30px;text-align:center;cursor:pointer;background:var(--bg);min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;" onclick="document.getElementById('signUploadInput').click()">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style="font-size:0.85em;color:var(--text-light);margin-top:8px;">לחץ או גרור תמונה לכאן</span>
+                <input type="file" id="signUploadInput" accept="image/*" style="display:none;" onchange="handleSignUpload(event)">
+            </div>
+            <div id="signUploadPreview" style="display:none;margin-top:10px;text-align:center;">
+                <img id="signUploadImg" style="max-width:100%;max-height:150px;border:1px solid var(--border);border-radius:8px;">
+                <button class="btn btn-ghost btn-sm" onclick="clearSignUpload()" style="margin-top:6px;font-size:0.78em;">הסר תמונה</button>
+            </div>
+        </div>
+        <!-- Actions -->
         <div style="display:flex;gap:8px;margin-top:14px;">
-            <button class="btn btn-outline" style="flex:1;" onclick="clearSignCanvas()">נקה</button>
             <button class="btn btn-outline" style="flex:1;" onclick="cancelSignCanvas()">ביטול</button>
-            <button class="btn btn-primary" style="flex:1;" onclick="confirmSignCanvas('${docId}',${JSON.stringify(fieldId)})">אשר</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmSignCanvas('${docId}',${JSON.stringify(fieldId)})">אשר חתימה</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
 
+    // Setup draw canvas
     const canvas = document.getElementById('signCanvas');
     const ctx = canvas.getContext('2d');
     let drawing = false;
@@ -1558,18 +2595,111 @@ function openSignatureCanvas(docId, fieldId) {
     canvas.onmouseup = canvas.ontouchend = () => { drawing = false; };
     canvas.onmouseleave = () => { drawing = false; };
     window._signCanvas = canvas;
+
+    // Setup upload drag & drop
+    const uploadArea = document.getElementById('signUploadArea');
+    if (uploadArea) {
+        uploadArea.ondragover = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--primary)'; uploadArea.style.background = 'rgba(37,99,235,0.05)'; };
+        uploadArea.ondragleave = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--border)'; uploadArea.style.background = 'var(--bg)'; };
+        uploadArea.ondrop = e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--border)'; uploadArea.style.background = 'var(--bg)'; if (e.dataTransfer.files[0]) processSignUploadFile(e.dataTransfer.files[0]); };
+    }
+}
+
+function switchSignTab(tab) {
+    window._signActiveTab = tab;
+    document.querySelectorAll('.sign-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.getElementById('signTabDraw').style.display = tab === 'draw' ? '' : 'none';
+    document.getElementById('signTabType').style.display = tab === 'type' ? '' : 'none';
+    document.getElementById('signTabUpload').style.display = tab === 'upload' ? '' : 'none';
+}
+
+function selectSignFont(btn) {
+    document.querySelectorAll('.sign-font-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    window._signFont = btn.dataset.font;
+    updateSignNamePreview();
+}
+
+function updateSignNamePreview() {
+    const input = document.getElementById('signNameInput');
+    const preview = document.getElementById('signNamePreview');
+    if (input && preview) {
+        preview.textContent = input.value || '';
+        preview.style.fontFamily = window._signFont || "'Segoe Script','Dancing Script',cursive";
+    }
+}
+
+function handleSignUpload(e) {
+    const file = e.target.files[0];
+    if (file) processSignUploadFile(file);
+}
+
+function processSignUploadFile(file) {
+    if (!file.type.startsWith('image/')) { toast('יש להעלות קובץ תמונה בלבד', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+        window._signUploadData = ev.target.result;
+        const preview = document.getElementById('signUploadPreview');
+        const img = document.getElementById('signUploadImg');
+        const area = document.getElementById('signUploadArea');
+        if (preview && img) { img.src = ev.target.result; preview.style.display = ''; }
+        if (area) area.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearSignUpload() {
+    window._signUploadData = null;
+    const preview = document.getElementById('signUploadPreview');
+    const area = document.getElementById('signUploadArea');
+    if (preview) preview.style.display = 'none';
+    if (area) area.style.display = '';
 }
 
 function clearSignCanvas() { const c = window._signCanvas; if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); }
-function cancelSignCanvas() { const m = document.getElementById('signModal'); if (m) m.remove(); delete window._signCanvas; }
+function cancelSignCanvas() { const m = document.getElementById('signModal'); if (m) m.remove(); delete window._signCanvas; window._signUploadData = null; }
 function confirmSignCanvas(docId, fieldId) {
-    const c = window._signCanvas; if (!c) return;
     const doc = DM.docs.find(d => d.id === docId);
-    if (doc) {
+    const tab = window._signActiveTab || 'draw';
+    let signatureData = null;
+
+    if (tab === 'draw') {
+        const c = window._signCanvas;
+        if (!c) return;
+        // Check if canvas is blank
+        const ctx = c.getContext('2d');
+        const pixels = ctx.getImageData(0, 0, c.width, c.height).data;
+        let hasContent = false;
+        for (let i = 3; i < pixels.length; i += 4) { if (pixels[i] > 0) { hasContent = true; break; } }
+        if (!hasContent) { toast('יש לצייר חתימה', 'error'); return; }
+        signatureData = c.toDataURL();
+    } else if (tab === 'type') {
+        const input = document.getElementById('signNameInput');
+        const name = input ? input.value.trim() : '';
+        if (!name) { toast('יש להקליד שם', 'error'); return; }
+        // Render name to canvas
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = 400; tmpCanvas.height = 120;
+        const ctx = tmpCanvas.getContext('2d');
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, 400, 120);
+        ctx.fillStyle = '#1e293b';
+        const font = window._signFont || "'Segoe Script','Dancing Script',cursive";
+        ctx.font = `36px ${font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(name, 200, 60, 380);
+        signatureData = tmpCanvas.toDataURL();
+    } else if (tab === 'upload') {
+        if (!window._signUploadData) { toast('יש להעלות תמונת חתימה', 'error'); return; }
+        signatureData = window._signUploadData;
+    }
+
+    if (doc && signatureData) {
         const f = (doc.fields || []).find(x => x.id === fieldId);
         if (f) {
             f.signedValue = 'חתום';
-            f.signatureData = c.toDataURL();
+            f.signatureData = signatureData;
             addAudit(doc, 'signed', `חתימה בשדה "${f.label}"`);
             save(); syncDocToFirebase(doc);
         }
@@ -1800,27 +2930,35 @@ function completeSign(docId) {
     } else {
         DM._currentSigner = null;
         DM._currentSignerEmail = null;
-        switchView('dashboard');
+        switchView('home');
     }
 }
 
 // ==================== MOBILE MENU ====================
 function toggleMobileMenu() {
-    const menu = document.getElementById('mobileMenu');
-    if (menu) menu.classList.toggle('hidden');
+    const sb = document.getElementById('appSidebar');
+    const bd = document.getElementById('sidebarBackdrop');
+    if (!sb) return;
+    const isOpen = sb.classList.contains('open');
+    sb.classList.toggle('open', !isOpen);
+    if (bd) bd.classList.toggle('show', !isOpen);
 }
 
 function closeMobileMenu() {
-    const menu = document.getElementById('mobileMenu');
-    if (menu) menu.classList.add('hidden');
+    const sb = document.getElementById('appSidebar');
+    const bd = document.getElementById('sidebarBackdrop');
+    if (sb) sb.classList.remove('open');
+    if (bd) bd.classList.remove('show');
 }
 
-// Close mobile menu when clicking outside
-document.addEventListener('click', e => {
-    const menu = document.getElementById('mobileMenu');
-    const btn = document.getElementById('mobileMenuBtn');
-    if (menu && btn && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
-        menu.classList.add('hidden');
+// Escape key to cancel field placement mode
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && DM._pendingFieldType) {
+        DM._pendingFieldType = null;
+        DM._pendingFieldLabel = null;
+        DM._lastFieldType = null;
+        DM._lastFieldLabel = null;
+        render();
     }
 });
 
