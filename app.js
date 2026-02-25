@@ -532,7 +532,6 @@ function useTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
-    DM.docPages = tpl.docPages || [];
     DM.pageHeights = tpl.pageHeights || [];
     DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
@@ -552,7 +551,6 @@ function editTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
-    DM.docPages = tpl.docPages || [];
     DM.pageHeights = tpl.pageHeights || [];
     DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
@@ -751,8 +749,9 @@ async function processFile(file) {
             }
 
             DM.docImage = combined.toDataURL('image/jpeg', 0.85);
-            // Store page info for proper PDF export
+            // Store page images in memory for editor (NOT saved to localStorage/Firebase)
             DM.docPages = pageCanvases.map(c => c.toDataURL('image/jpeg', 0.85));
+            // Store page boundary info for PDF export (only numbers - safe for storage)
             DM.pageHeights = pageHeights;
             DM.pageWidth = maxW;
             if (numPages > 1) toast(`${numPages} דפים נטענו בהצלחה`);
@@ -1620,7 +1619,6 @@ function createLinkOnly() {
         id: 'dm_' + Date.now(),
         fileName: DM.fileName || 'מסמך ללא שם',
         docImage: DM.docImage,
-        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
         pageHeights: DM.pageHeights || [],
         pageWidth: DM.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(DM.recipients)),
@@ -1697,7 +1695,6 @@ function saveAsTemplateFromDoc(docId) {
         id: 'tpl_' + Date.now(),
         fileName: doc.fileName,
         docImage: doc.docImage,
-        docPages: doc.docPages || [],
         pageHeights: doc.pageHeights || [],
         pageWidth: doc.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(doc.recipients)),
@@ -1721,7 +1718,6 @@ function sendDocument() {
         id: 'dm_' + Date.now(),
         fileName: DM.fileName,
         docImage: DM.docImage,
-        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
         pageHeights: DM.pageHeights || [],
         pageWidth: DM.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(DM.recipients)),
@@ -1771,7 +1767,6 @@ function saveTemplate() {
         id: DM.editingTemplateId || 'tpl_' + Date.now(),
         name: DM.fileName || 'תבנית ללא שם',
         docImage: DM.docImage,
-        docPages: DM.docPages && DM.docPages.length > 1 ? DM.docPages : [],
         pageHeights: DM.pageHeights || [],
         pageWidth: DM.pageWidth || 0,
         fields: JSON.parse(JSON.stringify(DM.fields)),
@@ -1909,9 +1904,9 @@ function renderSignView(el) {
         mainBtnAction = `navigateSignField('${doc.id}', 'next')`;
     }
 
-    // Page info
-    const hasPages = doc.docPages && doc.docPages.length > 1;
-    const numPages = hasPages ? doc.docPages.length : (doc.docImage ? 1 : 0);
+    // Page info (use pageHeights for count, docPages may not be stored)
+    const hasPages = doc.pageHeights && doc.pageHeights.length > 1;
+    const numPages = hasPages ? doc.pageHeights.length : (doc.docImage ? 1 : 0);
 
     el.innerHTML = `<div class="wizard">
         <!-- Sign Header -->
@@ -2283,37 +2278,28 @@ async function downloadSignedPDF(docId) {
         const imgW = mainImg.width;
         const editorScale = imgW / 800; // fields are positioned on 800px-wide editor
 
-        // Determine if we have multi-page info
-        const hasPages = doc.docPages && doc.docPages.length > 1 && doc.pageHeights && doc.pageHeights.length > 1;
+        // Determine if we have multi-page info (pageHeights stored as numbers, not images)
+        const hasPages = doc.pageHeights && doc.pageHeights.length > 1;
 
         if (hasPages) {
-            // Multi-page PDF: render each page separately
-            const pageImgs = [];
-            for (const pgSrc of doc.docPages) {
-                pageImgs.push(await loadImage(pgSrc));
-            }
-
-            // Create PDF with first page dimensions (use A4 px equivalent for better compatibility)
-            const firstPage = pageImgs[0];
-            const pdfW = firstPage.width;
-            const pdfH = firstPage.height;
-            const orientation = pdfW > pdfH ? 'l' : 'p';
-            const pdf = new jsPDF({ orientation, unit: 'px', format: [pdfW, pdfH], compress: true });
+            // Multi-page PDF: split combined image back into pages using pageHeights
+            const pgW = doc.pageWidth || imgW;
+            const firstPgH = doc.pageHeights[0];
+            const orientation = pgW > firstPgH ? 'l' : 'p';
+            const pdf = new jsPDF({ orientation, unit: 'px', format: [pgW, firstPgH], compress: true });
 
             let yOffset = 0;
-            for (let i = 0; i < pageImgs.length; i++) {
-                const pgImg = pageImgs[i];
-                const pgW = pgImg.width;
-                const pgH = pgImg.height;
+            for (let i = 0; i < doc.pageHeights.length; i++) {
+                const pgH = doc.pageHeights[i];
 
                 if (i > 0) pdf.addPage([pgW, pgH], pgW > pgH ? 'l' : 'p');
 
-                // Draw page background
+                // Crop this page from the combined image
                 const pgCanvas = document.createElement('canvas');
                 pgCanvas.width = pgW;
                 pgCanvas.height = pgH;
                 const pgCtx = pgCanvas.getContext('2d');
-                pgCtx.drawImage(pgImg, 0, 0);
+                pgCtx.drawImage(mainImg, 0, yOffset, pgW, pgH, 0, 0, pgW, pgH);
 
                 // Draw fields for this page
                 drawFields(pgCtx, editorScale, yOffset, pgH);
