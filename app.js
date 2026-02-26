@@ -55,9 +55,105 @@ const ICO = {
     link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>',
 };
 
+// ==================== IndexedDB for large image data ====================
+const _idbName = 'smoov_images_db';
+const _idbStore = 'images';
+let _idb = null;
+
+function openImageDB() {
+    return new Promise((resolve, reject) => {
+        if (_idb) { resolve(_idb); return; }
+        const req = indexedDB.open(_idbName, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(_idbStore);
+        req.onsuccess = () => { _idb = req.result; resolve(_idb); };
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbSaveImages(id, images) {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(_idbStore, 'readwrite');
+            tx.objectStore(_idbStore).put(images, id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch { return false; }
+}
+
+async function idbLoadImages(id) {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(_idbStore, 'readonly');
+            const req = tx.objectStore(_idbStore).get(id);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    } catch { return null; }
+}
+
+async function idbDeleteImages(id) {
+    try {
+        const db = await openImageDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction(_idbStore, 'readwrite');
+            tx.objectStore(_idbStore).delete(id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    } catch { return false; }
+}
+
+// Save images to IndexedDB, metadata to localStorage
 function save() {
-    localStorage.setItem('smoov_docs', JSON.stringify(DM.docs));
-    localStorage.setItem('smoov_templates', JSON.stringify(DM.templates));
+    // Strip large image data from localStorage copies
+    const docsLite = DM.docs.map(d => {
+        const copy = Object.assign({}, d);
+        delete copy.docImage;
+        delete copy.docPages;
+        return copy;
+    });
+    const tplsLite = DM.templates.map(t => {
+        const copy = Object.assign({}, t);
+        delete copy.docImage;
+        delete copy.docPages;
+        return copy;
+    });
+    try {
+        localStorage.setItem('smoov_docs', JSON.stringify(docsLite));
+        localStorage.setItem('smoov_templates', JSON.stringify(tplsLite));
+    } catch (e) {
+        console.warn('localStorage save error:', e);
+    }
+    // Save images to IndexedDB in background
+    DM.docs.forEach(d => {
+        if (d.id && (d.docImage || (d.docPages && d.docPages.length))) {
+            idbSaveImages(d.id, { docImage: d.docImage, docPages: d.docPages });
+        }
+    });
+    DM.templates.forEach(t => {
+        if (t.id && (t.docImage || (t.docPages && t.docPages.length))) {
+            idbSaveImages(t.id, { docImage: t.docImage, docPages: t.docPages });
+        }
+    });
+}
+
+// Load images from IndexedDB back into DM arrays on startup
+async function restoreImagesFromIDB() {
+    for (const d of DM.docs) {
+        if (d.id && !d.docImage) {
+            const imgs = await idbLoadImages(d.id);
+            if (imgs) { d.docImage = imgs.docImage; d.docPages = imgs.docPages || []; }
+        }
+    }
+    for (const t of DM.templates) {
+        if (t.id && !t.docImage) {
+            const imgs = await idbLoadImages(t.id);
+            if (imgs) { t.docImage = imgs.docImage; t.docPages = imgs.docPages || []; }
+        }
+    }
 }
 
 function toast(msg, type = 'success') {
@@ -4006,7 +4102,10 @@ function onAuthStateChanged(user) {
         userName.textContent = user.displayName || 'משתמש';
         userEmail.textContent = user.email || '';
 
-        if (!checkUrlHash()) render();
+        // Restore images from IndexedDB before first render
+        restoreImagesFromIDB().then(() => {
+            if (!checkUrlHash()) render();
+        });
         if (!isFillLink) syncOwnerDocsFromFirebase(user.email);
     } else if (isSignLink) {
         // Allow signing without login
@@ -4048,6 +4147,16 @@ if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/')) {
     document.getElementById('mainContent').style.display = '';
     document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';
 }
+
+// Migrate images from localStorage to IndexedDB (one-time on upgrade)
+(function migrateImages() {
+    const hasImages = DM.docs.some(d => d.docImage) || DM.templates.some(t => t.docImage);
+    if (hasImages) {
+        // Old format: images are in localStorage. Save them to IndexedDB and re-save stripped.
+        save(); // This saves images to IDB and strips from localStorage
+        console.log('Migrated images from localStorage to IndexedDB');
+    }
+})();
 
 // Initialize Firebase (auth listener will handle the rest)
 if (typeof initSmoovFirebase === 'function') initSmoovFirebase();
