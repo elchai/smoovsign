@@ -1339,7 +1339,7 @@ function setupCanvasDrop() {
         const dropY = (e.clientY - rect.top) / zoom;
 
         const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 26 : type === 'file' ? 140 : 120;
-        const defaultH = type === 'signature' ? 40 : type === 'checkbox' ? 26 : 28;
+        const defaultH = type === 'signature' ? 80 : type === 'checkbox' ? 26 : 28;
         const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
 
         const f = {
@@ -1490,7 +1490,7 @@ function onCanvasClick(e) {
     const label = DM._pendingFieldLabel;
     const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
     const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 26 : type === 'file' ? 140 : 120;
-    const defaultH = type === 'signature' ? 40 : type === 'checkbox' ? 26 : 28;
+    const defaultH = type === 'signature' ? 80 : type === 'checkbox' ? 26 : 28;
 
     const f = {
         id: Date.now() + Math.random(),
@@ -2256,32 +2256,33 @@ async function openSign(docId) {
 function showSignerVerification(doc) {
     const main = document.getElementById('mainContent');
     main.innerHTML = `<div class="verify-screen">
-        <div class="verify-card">
-            <div class="verify-icon">
-                <div class="login-logo-wrap" style="width:64px;height:64px;margin:0 auto;border-radius:18px;">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="1.5"/><polyline points="14 2 14 8 20 8" fill="none" stroke="white" stroke-width="1.5"/><path d="M8 15c2-3 4 1 5-1s2-4 3-1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        <div class="verify-card" style="padding:24px 28px;">
+            <div class="verify-icon" style="margin-bottom:10px;">
+                <div class="login-logo-wrap" style="width:52px;height:52px;margin:0 auto;border-radius:14px;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="1.5"/><polyline points="14 2 14 8 20 8" fill="none" stroke="white" stroke-width="1.5"/><path d="M8 15c2-3 4 1 5-1s2-4 3-1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
                 </div>
             </div>
-            <h2>אימות זהות</h2>
-            <p style="color:var(--text-light);margin-bottom:20px;">נא להזדהות לפני חתימה על "${doc.fileName}"</p>
-            <button class="google-signin-btn" onclick="googleSignForSigner('${doc.id}')" style="width:100%;margin-bottom:16px;justify-content:center;">
+            <h2 style="font-size:1.2em;margin-bottom:4px;">אימות זהות</h2>
+            <p style="color:var(--text-light);margin-bottom:4px;font-size:0.88em;">נא להזדהות לפני חתימה על</p>
+            <p style="color:var(--text);font-weight:700;margin-bottom:14px;font-size:0.92em;">"${doc.fileName}"</p>
+            <button class="google-signin-btn" onclick="googleSignForSigner('${doc.id}')" style="width:100%;margin-bottom:12px;justify-content:center;">
                 <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                 התחבר עם Google
             </button>
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
                 <div style="flex:1;height:1px;background:var(--border);"></div>
-                <span style="font-size:0.78em;color:var(--text-light);">או הזדהות ידנית</span>
+                <span style="font-size:0.75em;color:var(--text-light);">או הזדהות ידנית</span>
                 <div style="flex:1;height:1px;background:var(--border);"></div>
             </div>
-            <div class="form-group">
-                <label class="form-label">שם מלא</label>
-                <input type="text" class="form-input" id="verifyName" placeholder="הזן את שמך המלא...">
+            <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label" style="font-size:0.82em;">שם מלא</label>
+                <input type="text" class="form-input" id="verifyName" placeholder="הזן את שמך המלא..." style="padding:8px 10px;">
             </div>
-            <div class="form-group">
-                <label class="form-label">אימייל (לקבלת העתק חתימה)</label>
-                <input type="email" class="form-input" id="verifyEmail" placeholder="name@email.com" style="direction:ltr;text-align:right;">
+            <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label" style="font-size:0.82em;">אימייל (לקבלת העתק)</label>
+                <input type="email" class="form-input" id="verifyEmail" placeholder="name@email.com" style="direction:ltr;text-align:right;padding:8px 10px;">
             </div>
-            <button class="btn btn-primary btn-lg" style="width:100%;margin-top:8px;" onclick="verifySigner('${doc.id}')">כניסה לחתימה</button>
+            <button class="btn btn-primary btn-lg" style="width:100%;margin-top:4px;" onclick="verifySigner('${doc.id}')">כניסה לחתימה</button>
         </div>
     </div>`;
 }
