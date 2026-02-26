@@ -125,10 +125,12 @@ async function firebaseUpdateDoc(doc) {
 }
 
 // ==================== TEMPLATES ====================
+// Templates are stored in smoov_docs collection (same rules as docs, IDs use tpl_ prefix)
 async function firebaseSaveTemplate(tpl) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_templates').doc(tpl.id).set(JSON.parse(JSON.stringify(tpl)));
+        await smoovDb.collection('smoov_docs').doc(tpl.id).set(JSON.parse(JSON.stringify(tpl)));
+        console.log('Template saved to Firebase:', tpl.id);
         return true;
     } catch (err) {
         console.warn('Firestore save template error:', err);
@@ -139,8 +141,9 @@ async function firebaseSaveTemplate(tpl) {
 async function firebaseLoadTemplate(tplId) {
     if (!smoovFirestoreReady || !smoovDb) return null;
     try {
-        const snap = await smoovDb.collection('smoov_templates').doc(tplId).get();
-        if (snap.exists) return snap.data();
+        const snap = await smoovDb.collection('smoov_docs').doc(tplId).get();
+        if (snap.exists) { console.log('Template loaded from Firebase:', tplId); return snap.data(); }
+        console.warn('Template not found in Firebase:', tplId);
         return null;
     } catch (err) {
         console.warn('Firestore load template error:', err);
@@ -151,7 +154,7 @@ async function firebaseLoadTemplate(tplId) {
 async function firebaseDeleteTemplate(tplId) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_templates').doc(tplId).delete();
+        await smoovDb.collection('smoov_docs').doc(tplId).delete();
         return true;
     } catch (err) {
         console.warn('Firestore delete template error:', err);

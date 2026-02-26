@@ -2031,7 +2031,7 @@ function sendDocument() {
 }
 
 // ==================== SAVE TEMPLATE ====================
-function saveTemplate() {
+async function saveTemplate() {
     if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
 
@@ -2059,7 +2059,8 @@ function saveTemplate() {
 
     // Save to Firebase so external users can load via #fill/ link
     if (typeof firebaseSaveTemplate === 'function') {
-        firebaseSaveTemplate(tpl);
+        const saved = await firebaseSaveTemplate(tpl);
+        if (!saved) toast('שגיאה בשמירת התבנית לענן', 'error');
     }
 
     showTemplateLinkSuccess(tpl);
@@ -2835,6 +2836,8 @@ async function syncOwnerDocsFromFirebase(ownerEmail) {
         let added = 0;
         snapshot.forEach(docSnap => {
             const remoteDoc = docSnap.data();
+            // Skip templates (tpl_ prefix) - they're stored in same collection but belong in DM.templates
+            if (remoteDoc.id && remoteDoc.id.startsWith('tpl_')) return;
             const localIdx = DM.docs.findIndex(d => d.id === remoteDoc.id);
             if (localIdx < 0) {
                 DM.docs.push(remoteDoc);
@@ -4048,8 +4051,19 @@ function onAuthStateChanged(user) {
         // User is logged in
         smoovCurrentUser = user;
         loginScreen.style.display = 'none';
-        topbar.style.display = '';
         mainContent.style.display = '';
+
+        const isFillLink = hash.startsWith('#fill/');
+        if (isFillLink) {
+            // Fill-link signer: hide dashboard navigation, show only signing view
+            topbar.style.display = 'none';
+            userMenu.style.display = 'none';
+            const sidebar = document.getElementById('appSidebar');
+            if (sidebar) sidebar.style.display = 'none';
+        } else {
+            topbar.style.display = '';
+            userMenu.style.display = '';
+        }
 
         // Update user menu
         const avatar = document.getElementById('userAvatar');
@@ -4058,10 +4072,9 @@ function onAuthStateChanged(user) {
         avatar.src = user.photoURL || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%232563eb"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/></svg>');
         userName.textContent = user.displayName || 'משתמש';
         userEmail.textContent = user.email || '';
-        userMenu.style.display = '';
 
         if (!checkUrlHash()) render();
-        syncOwnerDocsFromFirebase(user.email);
+        if (!isFillLink) syncOwnerDocsFromFirebase(user.email);
     } else if (isSignLink) {
         // Allow signing without login
         loginScreen.style.display = 'none';
