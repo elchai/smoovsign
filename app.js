@@ -1375,7 +1375,7 @@ function renderFieldProps(f) {
         <div class="field-props-body">
             <div class="form-group">
                 <label class="form-label">תיאור השדה</label>
-                <input type="text" class="form-input" value="${f.label}" onchange="updateField(${f.id},'label',this.value)" style="font-weight:600;">
+                <input type="text" class="form-input" value="${f.label}" oninput="updateFieldLive(${f.id},'label',this.value)" onchange="updateField(${f.id},'label',this.value)" style="font-weight:600;">
             </div>
             <div class="form-group">
                 <label class="form-label">סוג שדה</label>
@@ -1523,6 +1523,19 @@ function deselectField(e) {
         render();
     }
 }
+// Live update field overlay while typing (no full re-render)
+function updateFieldLive(id, key, val) {
+    const f = DM.fields.find(x => x.id === id);
+    if (!f) return;
+    f[key] = val;
+    const box = document.querySelector(`.field-box[data-fid="${id}"]`);
+    if (!box) return;
+    if (key === 'label') {
+        const tag = box.querySelector('.field-label-tag');
+        if (tag) tag.textContent = val + (f.required ? ' *' : '');
+    }
+}
+
 function updateField(id, key, val) {
     const f = DM.fields.find(x => x.id === id);
     if (f) {
