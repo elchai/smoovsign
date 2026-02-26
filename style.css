@@ -966,7 +966,7 @@ input[type="range"]::-moz-range-thumb {
     .dashboard-search input { max-width: 100% !important; }
 
     /* --- Login --- */
-    .login-screen { padding-top: 8vh; }
+    .login-screen { padding-top: 0; }
     .login-card { padding: 36px 24px 28px; border-radius: 18px; }
     .login-card h1 { font-size: 24px; }
     .login-card > p { font-size: 14px; margin-bottom: 28px; }
@@ -1009,13 +1009,12 @@ input[type="range"]::-moz-range-thumb {
 
 /* ==================== LOGIN SCREEN ==================== */
 .login-screen {
-    display: flex;
-    align-items: flex-start;
+    display: none;
+    align-items: center;
     justify-content: center;
     min-height: 100vh;
     background: linear-gradient(160deg, #f0f4ff 0%, #dbeafe 40%, #c7d8ff 70%, #bfdbfe 100%);
     padding: 20px;
-    padding-top: 12vh;
     position: relative;
     overflow: hidden;
 }
