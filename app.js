@@ -1665,7 +1665,7 @@ function openEditorSignature(fieldId) {
     const canvas = document.getElementById('editorSignCanvas');
     const ctx = canvas.getContext('2d');
     let drawing = false;
-    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     function pos(e) {
         const r = canvas.getBoundingClientRect();
         const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
@@ -2204,10 +2204,20 @@ function copyTemplateFillLink(btn, tplId) {
 }
 
 // ==================== SIGNING VIEW ====================
-function openSign(docId) {
+async function openSign(docId) {
     DM.signDocId = docId;
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
+
+    // Ensure doc images are loaded (IDB first, then Firestore chunks)
+    if (!doc.docImage) {
+        const imgs = await idbLoadImages(docId);
+        if (imgs && imgs.docImage) { doc.docImage = imgs.docImage; doc.docPages = imgs.docPages || []; }
+        else if (typeof _loadImageChunks === 'function') {
+            const chunks = await _loadImageChunks(doc.templateId || docId);
+            if (chunks && chunks.docImage) { doc.docImage = chunks.docImage; doc.docPages = chunks.docPages || []; }
+        }
+    }
 
     const isSignLink = location.hash.startsWith('#sign/');
     const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
@@ -2376,7 +2386,16 @@ function renderSignView(el) {
                 <strong>המסמך נחתם בהצלחה!</strong>
                 <div style="font-size:0.82em;opacity:0.9;">הושלם: ${doc.completedAt ? new Date(doc.completedAt).toLocaleString('he-IL') : ''}</div>
             </div>
-        </div>` : ''}
+        </div>
+        ${isSignerView ? `
+        <div style="background:linear-gradient(135deg,#eff6ff,#f0f9ff);padding:20px 24px;text-align:center;border-bottom:1px solid var(--border);">
+            <div style="font-size:1.15em;font-weight:700;color:var(--text);margin-bottom:4px;">איזה כיף! נכון שזה היה פשוט?</div>
+            <div style="font-size:0.88em;color:var(--text-light);margin-bottom:14px;">צרו מסמכים דיגיטליים ואספו חתימות בקלות</div>
+            <a href="${location.origin}${location.pathname}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:white;padding:10px 24px;border-radius:10px;font-weight:700;font-size:0.92em;text-decoration:none;box-shadow:0 4px 12px rgba(37,99,235,0.3);transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                <svg width="22" height="22" viewBox="0 0 100 100"><defs><linearGradient id="cta-lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e0e7ff"/></linearGradient></defs><rect width="100" height="100" rx="20" fill="rgba(255,255,255,0.25)"/><path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="3.5"/><polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/><path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
+                פתחו חשבון SmoovSign בחינם
+            </a>
+        </div>` : ''}` : ''}
         ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
         ${!isSignerView ? `
         <div class="audit-panel hidden" id="auditPanel">
@@ -3054,7 +3073,7 @@ function openSignatureCanvas(docId, fieldId) {
 
     // Drawing settings
     window._signColor = '#2563eb';
-    const LINE_WIDTH = 2.5;
+    const LINE_WIDTH = 5;
 
     ctx.strokeStyle = window._signColor;
     ctx.lineWidth = LINE_WIDTH;
@@ -3230,7 +3249,7 @@ function redrawCanvas() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = window._signColor || '#2563eb';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
