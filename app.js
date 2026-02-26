@@ -840,6 +840,7 @@ function renderNextBtn() {
 function goStep(s) {
     if (s === 2 && !DM.docImage && !DM.isTemplate) { toast('יש להעלות מסמך קודם', 'error'); return; }
     if (DM.isTemplate && s === 2 && !DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
+    if (s === 4 && DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
     DM.step = s;
     render();
 }
@@ -1866,9 +1867,9 @@ function renderSend(el) {
                         <input type="date" class="form-input" id="docExpiry" style="direction:ltr;text-align:right;">
                     </div>
                 </div>
-                <div style="margin-top:12px;text-align:center;">
-                    <button class="btn-link" onclick="createLinkOnly()" style="font-size:0.85em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">צור קישור ללא שליחה</button>
-                </div>
+                ${DM.recipients.length > 0 ? `<div style="margin-top:12px;text-align:center;">
+                    <button class="btn-link" onclick="createLinkOnly()" style="font-size:0.85em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">צור קישור לשיתוף ללא שליחה</button>
+                </div>` : ''}
             </div>
         </div>
     </div>`;
