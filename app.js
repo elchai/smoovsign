@@ -2330,8 +2330,6 @@ function highlightNextFieldById(fieldId) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             el.classList.add('pulse');
             setTimeout(() => el.classList.remove('pulse'), 2000);
-            // Auto-trigger the field on mobile for better UX
-            setTimeout(() => el.click(), 600);
         }
     }, 300);
 }
@@ -2788,7 +2786,7 @@ function openSignatureCanvas(docId, fieldId) {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                     <span style="font-size:0.75em;color:var(--text-light);">צבע:</span>
-                    <input type="color" id="signColor" value="#1e293b" onchange="updateSignColor()" style="width:30px;height:22px;border:none;border-radius:4px;cursor:pointer;">
+                    <input type="color" id="signColor" value="#2563eb" onchange="updateSignColor()" style="width:30px;height:22px;border:none;border-radius:4px;cursor:pointer;">
                 </div>
             </div>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
@@ -2816,7 +2814,7 @@ function openSignatureCanvas(docId, fieldId) {
                 <button class="sign-font-btn" data-font="'Georgia', serif" onclick="selectSignFont(this)" style="font-family:Georgia,serif;font-style:italic;">חתימה</button>
             </div>
             <div style="border:2px solid var(--border);border-radius:8px;background:white;min-height:80px;display:flex;align-items:center;justify-content:center;padding:12px;">
-                <span id="signNamePreview" style="font-size:2em;color:#1e293b;font-family:'Segoe Script','Dancing Script',cursive;"></span>
+                <span id="signNamePreview" style="font-size:2em;color:#2563eb;font-family:'Segoe Script','Dancing Script',cursive;"></span>
             </div>
         </div>
         <!-- Tab: Upload -->
@@ -2862,7 +2860,7 @@ function openSignatureCanvas(docId, fieldId) {
     let currentStroke = [];
 
     // Drawing settings - initialize globals
-    window._signColor = '#1e293b';
+    window._signColor = '#2563eb';
     window._signBaseWidth = 2.5;
 
     ctx.strokeStyle = window._signColor;
@@ -3076,7 +3074,7 @@ function redrawCanvas() {
     strokeHistory.forEach(stroke => {
         if (stroke.length < 2) return;
 
-        ctx.strokeStyle = window._signColor || '#1e293b';
+        ctx.strokeStyle = window._signColor || '#2563eb';
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -3150,7 +3148,7 @@ function confirmSignCanvas(docId, fieldId) {
         const ctx = tmpCanvas.getContext('2d');
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, 400, 120);
-        ctx.fillStyle = '#1e293b';
+        ctx.fillStyle = window._signColor || '#2563eb';
         const font = window._signFont || "'Segoe Script','Dancing Script',cursive";
         ctx.font = `36px ${font}`;
         ctx.textAlign = 'center';
