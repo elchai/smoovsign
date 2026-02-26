@@ -164,7 +164,7 @@ body.fullscreen-view .wizard { height: 100vh; }
 .dtc-name { flex: 2; }
 .dtc-rcpt { flex: 1.5; }
 .dtc-status { flex: 1.5; flex-direction: column; align-items: flex-start; gap: 2px; }
-.dtc-actions { flex: 1; justify-content: flex-end; gap: 4px; }
+.dtc-actions { flex: 1.2; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
 
 /* Avatar initials */
 .avatar-initials {
