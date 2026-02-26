@@ -2786,16 +2786,9 @@ function openSignatureCanvas(docId, fieldId) {
         <!-- Tab: Draw -->
         <div class="sign-tab-content" id="signTabDraw">
             <!-- Drawing Controls -->
-            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:4px;">
-                    <span style="font-size:0.75em;color:var(--text-light);">עובי:</span>
-                    <input type="range" id="signThickness" min="1" max="8" value="2.5" step="0.5" onchange="updateSignThickness()" style="width:60px;">
-                    <span id="thicknessValue" style="font-size:0.75em;min-width:20px;color:var(--text-light);">2.5</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:4px;">
-                    <span style="font-size:0.75em;color:var(--text-light);">צבע:</span>
-                    <input type="color" id="signColor" value="#2563eb" onchange="updateSignColor()" style="width:30px;height:22px;border:none;border-radius:4px;cursor:pointer;">
-                </div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+                <span style="font-size:0.75em;color:var(--text-light);">צבע:</span>
+                <input type="color" id="signColor" value="#2563eb" onchange="updateSignColor()" style="width:30px;height:22px;border:none;border-radius:4px;cursor:pointer;">
             </div>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
             <canvas id="signCanvas" class="sign-canvas" width="800" height="360" style="width:100%;max-width:460px;height:180px;border:2px solid var(--border);border-radius:8px;background:white;touch-action:none;"></canvas>
@@ -2861,61 +2854,29 @@ function openSignatureCanvas(docId, fieldId) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Enhanced drawing state
+    // Drawing state
     let drawing = false;
     let lastPos = null;
     let strokeHistory = [];
     let currentStroke = [];
 
-    // Drawing settings - initialize globals
+    // Drawing settings
     window._signColor = '#2563eb';
-    window._signBaseWidth = 2.5;
+    const LINE_WIDTH = 2.5;
 
     ctx.strokeStyle = window._signColor;
-    ctx.lineWidth = window._signBaseWidth;
+    ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Smoothing parameters
-    const SMOOTHING = 0.4;
-    const MIN_DISTANCE = 1.5;
 
     function pos(e) {
         const r = canvas.getBoundingClientRect();
         const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
         const cy = (e.clientY || e.touches?.[0]?.clientY || 0) - r.top;
-        // Get pressure for touch events (if available)
-        const pressure = e.touches?.[0]?.force || e.pressure || 0.5;
         return {
             x: cx * (canvas.width / r.width),
-            y: cy * (canvas.height / r.height),
-            pressure: Math.min(Math.max(pressure, 0.1), 1.0)
+            y: cy * (canvas.height / r.height)
         };
-    }
-
-    function distance(p1, p2) {
-        return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-    }
-
-    function drawSmoothLine(p1, p2, pressure) {
-        if (!p1 || !p2) return;
-
-        // Vary line width based on pressure
-        const baseWidth = 2.5;
-        const pressureWidth = baseWidth * (0.5 + pressure * 0.8);
-        ctx.lineWidth = pressureWidth;
-
-        // Smooth curve between points
-        const xc = (p1.x + p2.x) / 2;
-        const yc = (p1.y + p2.y) / 2;
-
-        ctx.beginPath();
-        ctx.moveTo(lastPos?.x || p1.x, lastPos?.y || p1.y);
-        ctx.quadraticCurveTo(p1.x, p1.y, xc, yc);
-        ctx.stroke();
-
-        lastPos = p2;
     }
 
     function startDrawing(e) {
@@ -2924,6 +2885,8 @@ function openSignatureCanvas(docId, fieldId) {
         const p = pos(e);
         lastPos = p;
         currentStroke = [p];
+        ctx.strokeStyle = window._signColor;
+        ctx.lineWidth = LINE_WIDTH;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
     }
@@ -2931,25 +2894,21 @@ function openSignatureCanvas(docId, fieldId) {
     function continueDrawing(e) {
         if (!drawing) return;
         e.preventDefault();
-
         const p = pos(e);
-
-        // Only draw if we've moved enough distance for smoother lines
-        if (lastPos && distance(lastPos, p) < MIN_DISTANCE) return;
-
         currentStroke.push(p);
-        drawSmoothLine(lastPos, p, p.pressure);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        lastPos = p;
     }
 
     function stopDrawing() {
         if (!drawing) return;
         drawing = false;
-
-        // Save stroke to history for undo functionality
         if (currentStroke.length > 0) {
             strokeHistory.push([...currentStroke]);
         }
-
         currentStroke = [];
         lastPos = null;
         updateUndoButton();
@@ -3078,35 +3037,19 @@ function redrawCanvas() {
 
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = window._signColor || '#2563eb';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     strokeHistory.forEach(stroke => {
         if (stroke.length < 2) return;
-
-        ctx.strokeStyle = window._signColor || '#2563eb';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        let lastPos = null;
-        stroke.forEach((point, index) => {
-            if (index === 0) {
-                ctx.beginPath();
-                ctx.moveTo(point.x, point.y);
-                lastPos = point;
-                return;
-            }
-
-            const baseWidth = window._signBaseWidth || 2.5;
-            const pressureWidth = baseWidth * (0.5 + point.pressure * 0.8);
-            ctx.lineWidth = pressureWidth;
-
-            if (lastPos) {
-                const xc = (lastPos.x + point.x) / 2;
-                const yc = (lastPos.y + point.y) / 2;
-                ctx.quadraticCurveTo(lastPos.x, lastPos.y, xc, yc);
-                ctx.stroke();
-            }
-            lastPos = point;
-        });
+        ctx.beginPath();
+        ctx.moveTo(stroke[0].x, stroke[0].y);
+        for (let i = 1; i < stroke.length; i++) {
+            ctx.lineTo(stroke[i].x, stroke[i].y);
+        }
+        ctx.stroke();
     });
 }
 
