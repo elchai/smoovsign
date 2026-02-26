@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='url(%23g)'/%3E%3Cpath d='M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='3.5'/%3E%3Cpolyline points='58 16 58 42 72 42' fill='none' stroke='white' stroke-width='3.5'/%3E%3Cpath d='M36 60c8-12 14 4 18-4s8-14 12-4' stroke='white' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='38' fill='url(%23g)'/%3E%3Cpath d='M105 30H66a14 14 0 00-14 14v92a14 14 0 0014 14h48a14 14 0 0014-14V76l-23-46z' fill='rgba(255,255,255,0.2)' stroke='white' stroke-width='6'/%3E%3Cpolyline points='105 30 105 76 128 76' fill='none' stroke='white' stroke-width='6'/%3E%3Cpath d='M66 110c14-22 24 8 32-6s14-24 20-6' stroke='white' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -23,14 +23,14 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js?v=4"></script>
+    <script src="firebase-config.js?v=5"></script>
     <!-- jsPDF for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <!-- html2pdf.js for pixel-perfect DOM-to-PDF rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
     <!-- EmailJS SDK for email notifications -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-    <script src="email-config.js?v=4"></script>
+    <script src="email-config.js?v=5"></script>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -96,7 +96,78 @@
                 התחבר עם Google
             </button>
             <div class="login-footer">
-                <small>בהתחברות אתה מסכים ל<a href="#">תנאי השימוש</a> ו<a href="#">מדיניות הפרטיות</a></small>
+                <small>בהתחברות אתה מסכים ל<a href="#" onclick="event.preventDefault();document.getElementById('termsModal').style.display='flex'">תנאי השימוש</a> ו<a href="#" onclick="event.preventDefault();document.getElementById('privacyModal').style.display='flex'">מדיניות הפרטיות</a></small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terms of Service Modal -->
+    <div id="termsModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#fff;border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;padding:32px;direction:rtl;position:relative;">
+            <button onclick="document.getElementById('termsModal').style.display='none'" style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:1.5em;cursor:pointer;color:#64748b;">&times;</button>
+            <h2 style="margin:0 0 20px;font-size:1.4em;color:#1e293b;">תנאי שימוש - SmoovSign</h2>
+            <div style="color:#475569;font-size:0.9em;line-height:1.8;">
+                <p><strong>עדכון אחרון:</strong> פברואר 2026</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">1. כללי</h3>
+                <p>ברוכים הבאים ל-SmoovSign. השימוש בשירות מהווה הסכמה לתנאים אלו. השירות מאפשר יצירה, ניהול וחתימה דיגיטלית על מסמכים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">2. הרשמה וחשבון</h3>
+                <p>ההתחברות מתבצעת באמצעות חשבון Google. אתה אחראי לשמירת אבטחת חשבונך ולכל פעולה המתבצעת דרכו.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">3. השימוש בשירות</h3>
+                <p>השירות מיועד ליצירת מסמכים דיגיטליים ואיסוף חתימות. המשתמש מתחייב שלא להשתמש בשירות למטרות בלתי חוקיות, הפצת תוכן פוגעני, או התחזות לאחרים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">4. תוכן המשתמש</h3>
+                <p>אתה שומר על כל הזכויות בתוכן שאתה מעלה. SmoovSign לא תשתמש בתוכן שלך למטרות שיווקיות ללא הסכמתך. אתה אחראי לוודא שיש לך זכות להעלות את התוכן.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">5. חתימה דיגיטלית</h3>
+                <p>החתימות באמצעות SmoovSign מבוססות על הסכמה אלקטרונית. SmoovSign אינה מתחייבת שחתימה דיגיטלית תעמוד בדרישות חוקיות ספציפיות בכל תחום שיפוט. באחריותך לוודא שהחתימה הדיגיטלית מתאימה לצרכיך המשפטיים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">6. זמינות השירות</h3>
+                <p>אנו שואפים לספק שירות רציף ואמין, אך איננו מתחייבים לזמינות של 100%. ייתכנו הפסקות לצורך תחזוקה ושדרוגים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">7. הגבלת אחריות</h3>
+                <p>השירות מסופק "כמות שהוא" (AS IS). SmoovSign לא תהיה אחראית לנזק ישיר או עקיף הנובע מהשימוש בשירות, כולל אובדן מסמכים או נתונים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">8. שינויים בתנאים</h3>
+                <p>אנו שומרים לעצמנו את הזכות לעדכן תנאים אלו. שינויים מהותיים יפורסמו מראש. המשך השימוש לאחר עדכון מהווה הסכמה לתנאים החדשים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">9. יצירת קשר</h3>
+                <p>לשאלות בנוגע לתנאי השימוש, ניתן לפנות אלינו בכתובת: support@smoovsign.com</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+        <div style="background:#fff;border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;padding:32px;direction:rtl;position:relative;">
+            <button onclick="document.getElementById('privacyModal').style.display='none'" style="position:absolute;top:12px;left:12px;background:none;border:none;font-size:1.5em;cursor:pointer;color:#64748b;">&times;</button>
+            <h2 style="margin:0 0 20px;font-size:1.4em;color:#1e293b;">מדיניות פרטיות - SmoovSign</h2>
+            <div style="color:#475569;font-size:0.9em;line-height:1.8;">
+                <p><strong>עדכון אחרון:</strong> פברואר 2026</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">1. מידע שאנו אוספים</h3>
+                <p><strong>מידע מחשבון Google:</strong> שם מלא, כתובת דוא"ל ותמונת פרופיל - לצורך זיהוי והתחברות בלבד.</p>
+                <p><strong>מסמכים ותוכן:</strong> מסמכים שאתה מעלה, שדות חתימה וחתימות שנאספות - נשמרים לצורך תפעול השירות.</p>
+                <p><strong>נתוני שימוש:</strong> מידע טכני בסיסי כמו סוג הדפדפן וזמני גישה - לצורך שיפור השירות.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">2. כיצד אנו משתמשים במידע</h3>
+                <p>המידע שלך משמש אך ורק לצורך:</p>
+                <ul style="padding-right:20px;">
+                    <li>הפעלת השירות ומתן חוויית משתמש</li>
+                    <li>שמירת המסמכים והחתימות שלך</li>
+                    <li>שליחת התראות על מסמכים שממתינים לחתימה</li>
+                    <li>שיפור ופיתוח השירות</li>
+                </ul>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">3. אחסון מידע</h3>
+                <p>המסמכים שלך מאוחסנים ב-Firebase (Google Cloud) באבטחה גבוהה. נתונים מקומיים נשמרים בדפדפן שלך (localStorage ו-IndexedDB). איננו מוכרים או משתפים מידע אישי עם צדדים שלישיים.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">4. שיתוף מידע</h3>
+                <p>אנו לא מוכרים, סוחרים או מעבירים מידע אישי לצדדים שלישיים. מידע עשוי להיות משותף רק במקרים הבאים:</p>
+                <ul style="padding-right:20px;">
+                    <li>בהסכמתך המפורשת</li>
+                    <li>כנדרש על פי חוק או צו בית משפט</li>
+                    <li>לנמענים שאתה שולח להם מסמכים לחתימה (שם ומסמך בלבד)</li>
+                </ul>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">5. אבטחת מידע</h3>
+                <p>אנו נוקטים באמצעי אבטחה סבירים להגנה על המידע שלך, כולל הצפנה בהעברה (HTTPS) ואבטחת גישה לבסיסי הנתונים. עם זאת, אין שיטת אבטחה מושלמת ואיננו יכולים להבטיח אבטחה מוחלטת.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">6. הזכויות שלך</h3>
+                <p>יש לך זכות לגשת למידע שלך, לתקנו או למחוק אותו. ניתן למחוק את חשבונך ואת כל המידע הקשור אליו בכל עת על ידי פנייה אלינו.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">7. עוגיות (Cookies)</h3>
+                <p>השירות משתמש בעוגיות הכרחיות לתפעול (כמו אימות Firebase). איננו משתמשים בעוגיות מעקב או פרסום.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">8. שינויים במדיניות</h3>
+                <p>אנו עשויים לעדכן מדיניות זו מעת לעת. שינויים מהותיים יפורסמו בשירות.</p>
+                <h3 style="color:#1e293b;margin:16px 0 8px;">9. יצירת קשר</h3>
+                <p>לשאלות בנוגע לפרטיות, ניתן לפנות אלינו בכתובת: privacy@smoovsign.com</p>
             </div>
         </div>
     </div>
@@ -104,6 +175,6 @@
     <!-- Toast -->
     <div id="toast" class="toast hidden"></div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
