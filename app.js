@@ -89,7 +89,7 @@ function renderSidebar() {
     if (!sb) return;
 
     const v = DM.view;
-    const waitingCount = DM.docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date())).length;
+    const waitingCount = DM.docs.filter(d => !d._deleted && d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date())).length;
     const docsOpen = DM._sidebarOpen.docs;
     const tplOpen = DM._sidebarOpen.templates;
     const isDocView = v.startsWith('docs_') || v === 'home';
