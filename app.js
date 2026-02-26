@@ -2115,9 +2115,21 @@ function openSign(docId) {
     const isSignLink = location.hash.startsWith('#sign/');
     const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
 
-    // If owner is logged in - go directly to owner view (no verification needed)
+    // If user is logged in - check if they're the owner or a signer
     if (isLoggedIn) {
-        DM._currentSigner = null;
+        const isOwner = !doc.ownerUid || doc.ownerUid === smoovCurrentUser.uid;
+        if (isOwner) {
+            // Owner view - full access
+            DM._currentSigner = null;
+            DM.view = 'sign';
+            render();
+            return;
+        }
+        // Logged-in signer (from #fill/ link) - set signer identity from Google account
+        if (!DM._currentSigner) {
+            DM._currentSigner = smoovCurrentUser.displayName || smoovCurrentUser.email || 'חותם';
+            DM._currentSignerEmail = smoovCurrentUser.email || '';
+        }
         DM.view = 'sign';
         render();
         return;
@@ -3609,6 +3621,9 @@ async function loadAndCloneTemplate(tplId) {
         // Clone template into a NEW document
         const docId = 'dm_' + Date.now();
         const now = new Date().toISOString();
+        const signerName = (smoovCurrentUser && smoovCurrentUser.displayName) || '';
+        const signerEmail = (smoovCurrentUser && smoovCurrentUser.email) || '';
+        const signerUid = (smoovCurrentUser && smoovCurrentUser.uid) || '';
         const newDoc = {
             id: docId,
             fileName: tpl.name || tpl.fileName || 'מסמך מתבנית',
@@ -3630,9 +3645,16 @@ async function loadAndCloneTemplate(tplId) {
             templateName: tpl.name || '',
             createdBy: tpl.createdBy || '',
             ownerUid: tpl.ownerUid || '',
+            signerName: signerName,
+            signerEmail: signerEmail,
+            signerUid: signerUid,
             createdAt: now,
-            audit: [{ action: 'created', detail: 'נוצר מתבנית: ' + (tpl.name || ''), time: now }]
+            audit: [{ action: 'created', detail: 'נוצר מתבנית: ' + (tpl.name || '') + (signerName ? ' ע"י ' + signerName : ''), time: now }]
         };
+
+        // Set signer identity from Google account
+        DM._currentSigner = signerName || signerEmail || 'חותם';
+        DM._currentSignerEmail = signerEmail;
 
         DM.docs.push(newDoc);
         save();
@@ -4020,7 +4042,7 @@ function onAuthStateChanged(user) {
 
     // Signing links should work without auth
     const hash = window.location.hash;
-    const isSignLink = hash.startsWith('#sign/') || hash.startsWith('#fill/');
+    const isSignLink = hash.startsWith('#sign/');
 
     if (user) {
         // User is logged in
@@ -4053,6 +4075,19 @@ function onAuthStateChanged(user) {
         topbar.style.display = 'none';
         mainContent.style.display = 'none';
         userMenu.style.display = 'none';
+
+        // Show fill-link hint if opening a template fill link
+        if (hash.startsWith('#fill/')) {
+            const card = loginScreen.querySelector('.login-card');
+            if (card && !card.querySelector('.fill-link-hint')) {
+                const hint = document.createElement('div');
+                hint.className = 'fill-link-hint';
+                hint.style.cssText = 'background:var(--bg-light,#f1f5f9);padding:12px;border-radius:8px;margin-bottom:16px;font-size:0.85em;color:var(--text-light,#64748b);text-align:center;';
+                hint.innerHTML = 'נא להתחבר עם חשבון Google כדי למלא את המסמך.<br>כל משתמש מקבל עותק אישי למילוי.';
+                const btn = card.querySelector('.google-signin-btn');
+                if (btn) card.insertBefore(hint, btn);
+            }
+        }
     }
 }
 
@@ -4062,7 +4097,7 @@ document.getElementById('mainContent').style.display = 'none';
 
 // For sign/share links: show content immediately without waiting for auth
 const _initHash = window.location.hash;
-if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/') || _initHash.startsWith('#fill/')) {
+if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/')) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainContent').style.display = '';
     document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';
