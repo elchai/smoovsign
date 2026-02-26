@@ -771,11 +771,12 @@ function resetEditor() {
     DM.isResizing = false;
     DM.editingTemplateId = null;
     DM.recipientSearch = '';
+    DM._allowNoRecipients = false;
 }
 
 // ==================== WIZARD ====================
 function renderWizard(el) {
-    if (DM.recipients.length === 0 && !DM.isTemplate) {
+    if (DM.recipients.length === 0 && !DM.isTemplate && !DM._allowNoRecipients) {
         DM.recipients = [{ id: 1, name: '', phone: '', colorIndex: 0, type: 'sender' }];
         DM.activeRecipientId = 1;
     }
@@ -820,7 +821,11 @@ function renderNextBtn() {
         const disabled = DM.step === 1 && !DM.docImage ? 'disabled' : '';
         el.innerHTML = `<button class="btn btn-primary btn-lg" onclick="goStep(${DM.step + 1})" ${disabled}>הבא</button>`;
     } else {
-        el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>`;
+        if (DM.recipients.length === 0 || DM.recipients.every(r => !r.name || !r.name.trim())) {
+            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="createLinkOnly()">צור קישור לשיתוף</button>`;
+        } else {
+            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>`;
+        }
     }
 }
 
@@ -1011,6 +1016,13 @@ function renderRecipients(el) {
             </div>`;
         }).join('')}
         <button class="add-recipient-btn" onclick="addRecipient()">+ הוסף נמען</button>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:center;">
+            <p style="font-size:0.85em;color:var(--text-light);margin-bottom:10px;">או צור קישור לשיתוף ללא ציון נמענים</p>
+            <button class="btn btn-outline" onclick="DM._allowNoRecipients=true;DM.recipients=[];DM.step=3;render();" style="font-size:0.88em;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-left:4px;"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                המשך ללא נמענים (קישור)
+            </button>
+        </div>
     </div>`;
 }
 
@@ -1808,6 +1820,7 @@ function renderSend(el) {
                     <button class="btn-link" onclick="DM._showInstructions=true;render();" style="font-size:0.82em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">+ הוסף הנחיות למילוי</button>
                 </div>`}
                 <div style="margin-top:12px;">
+                    ${DM.recipients.length > 0 ? `
                     <label class="form-label" style="margin-bottom:8px;">נמענים:</label>
                     ${DM.recipients.map(r => {
                         const c = DM.fieldColors[r.colorIndex % DM.fieldColors.length];
@@ -1820,6 +1833,11 @@ function renderSend(el) {
                             <span style="margin-right:auto;font-size:0.72em;background:var(--card);padding:2px 8px;border-radius:10px;">${fc} שדות</span>
                         </div>`;
                     }).join('')}
+                    ` : `
+                    <div style="padding:12px;background:var(--primary-light);border-radius:8px;text-align:center;">
+                        <span style="font-size:0.85em;color:var(--primary);font-weight:600;">ללא נמענים - יופץ כקישור לכל מי שמקבל אותו</span>
+                    </div>
+                    `}
                 </div>
             </div>
 
@@ -2271,10 +2289,9 @@ function renderSignView(el) {
             </div>
         </div>
     </div>`;
-    // Auto-highlight first unsigned field for signer
-    if (!isComplete && !isExpired) {
+    // Auto-highlight first unsigned field only on initial load (not after navigation)
+    if (!isComplete && !isExpired && DM._signFieldIdx === -1) {
         if (isSignerView && signerRecipient) {
-            // Highlight first unsigned field of THIS signer
             const nextField = (doc.fields || []).find(f => f.assigneeId === signerRecipient.id && f.required && !f.fixed && !f.signedValue && !f.value);
             if (nextField) highlightNextFieldById(nextField.id);
         } else {
@@ -2344,6 +2361,16 @@ function navigateSignField(docId, direction) {
 
     if (fillableFields.length === 0) return;
 
+    // Validate current required field before advancing
+    if (direction === 'next' && DM._signFieldIdx >= 0 && DM._signFieldIdx < fillableFields.length) {
+        const currentField = fillableFields[DM._signFieldIdx];
+        if (currentField && currentField.required && !currentField.signedValue) {
+            toast('יש למלא שדה חובה זה לפני המעבר', 'error');
+            highlightNextFieldById(currentField.id);
+            return;
+        }
+    }
+
     if (direction === 'next') {
         DM._signFieldIdx = Math.min((DM._signFieldIdx || 0) + 1, fillableFields.length - 1);
         if (DM._signFieldIdx < 0) DM._signFieldIdx = 0;
@@ -2356,7 +2383,35 @@ function navigateSignField(docId, direction) {
         highlightNextFieldById(targetField.id);
     }
     // Update button text without full re-render
-    render();
+    updateSignNavButton(docId);
+}
+
+function updateSignNavButton(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+    const mainBtn = document.querySelector('.sign-main-btn');
+    if (!mainBtn) return;
+
+    const isSignerView = !!DM._currentSigner;
+    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
+    const myFields = isSignerView && signerRecipient
+        ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
+        : (doc.fields || []).filter(f => !f.fixed);
+    const allFilled = myFields.length > 0 && myFields.every(f => f.signedValue);
+
+    if (allFilled) {
+        mainBtn.textContent = 'סיום';
+        mainBtn.setAttribute('onclick', `completeSign('${docId}')`);
+    } else {
+        mainBtn.textContent = 'הבא';
+        mainBtn.setAttribute('onclick', `navigateSignField('${docId}', 'next')`);
+    }
+
+    // Update progress bar
+    const filled = myFields.filter(f => f.signedValue).length;
+    const pct = myFields.length > 0 ? Math.round((filled / myFields.length) * 100) : 0;
+    const progressFill = document.querySelector('.sign-progress-fill');
+    if (progressFill) progressFill.style.width = pct + '%';
 }
 
 function exitAndSave(docId) {
@@ -3399,10 +3454,24 @@ function completeSign(docId) {
     const isSignerView = !!DM._currentSigner;
     let signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
 
-    // If signer name doesn't match any recipient, match to first unsigned (or first if only one)
+    // If signer name doesn't match any recipient, match to first unsigned or create one
     if (isSignerView && !signerRecipient) {
         const recipients = doc.recipients || [];
         signerRecipient = recipients.find(r => !r.signed) || recipients[0];
+        if (!signerRecipient) {
+            // No predefined recipients (template link) - create from signer info
+            signerRecipient = {
+                id: Date.now(),
+                name: DM._currentSigner || 'חותם',
+                phone: '',
+                email: DM._currentSignerEmail || '',
+                colorIndex: 0,
+                type: 'signer',
+                signed: false
+            };
+            doc.recipients = doc.recipients || [];
+            doc.recipients.push(signerRecipient);
+        }
         if (signerRecipient) signerRecipient.name = DM._currentSigner;
     }
 
@@ -3989,6 +4058,14 @@ function onAuthStateChanged(user) {
 // Init: hide app until auth resolves
 document.querySelector('.topbar').style.display = 'none';
 document.getElementById('mainContent').style.display = 'none';
+
+// For sign/share links: show content immediately without waiting for auth
+const _initHash = window.location.hash;
+if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/')) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainContent').style.display = '';
+    document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';
+}
 
 // Initialize Firebase (auth listener will handle the rest)
 if (typeof initSmoovFirebase === 'function') initSmoovFirebase();
