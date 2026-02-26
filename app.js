@@ -694,6 +694,10 @@ function renderTemplates(el) {
                 </div>
                 <div class="doc-actions">
                     <button class="btn btn-sm btn-primary" onclick="useTemplate('${t.id}')">שלח מתבנית</button>
+                    <button class="btn btn-sm btn-outline" onclick="copyTemplateFillLink(this,'${t.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        קישור
+                    </button>
                     <button class="btn btn-sm btn-outline" onclick="editTemplate('${t.id}')">ערוך</button>
                     <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteTemplate('${t.id}')">מחק</button>
                 </div>
@@ -706,6 +710,7 @@ function deleteTemplate(id) {
     if (!confirm('למחוק תבנית זו?')) return;
     DM.templates = DM.templates.filter(t => t.id !== id);
     save();
+    if (typeof firebaseDeleteTemplate === 'function') firebaseDeleteTemplate(id);
     render();
 }
 
@@ -1955,16 +1960,21 @@ function saveAsTemplateFromDoc(docId) {
     if (!doc) return;
     const tpl = {
         id: 'tpl_' + Date.now(),
+        name: doc.fileName,
         fileName: doc.fileName,
         docImage: doc.docImage,
+        docPages: doc.docPages || [],
         pageHeights: doc.pageHeights || [],
         pageWidth: doc.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(doc.recipients)),
         fields: JSON.parse(JSON.stringify(doc.fields)),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
+        ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
     };
     DM.templates.push(tpl);
     save();
+    if (typeof firebaseSaveTemplate === 'function') firebaseSaveTemplate(tpl);
     toast('התבנית נשמרה בהצלחה!');
 }
 
@@ -2029,11 +2039,14 @@ function saveTemplate() {
         id: DM.editingTemplateId || 'tpl_' + Date.now(),
         name: DM.fileName || 'תבנית ללא שם',
         docImage: DM.docImage,
+        docPages: DM.docPages || [],
         pageHeights: DM.pageHeights || [],
         pageWidth: DM.pageWidth || 0,
         fields: JSON.parse(JSON.stringify(DM.fields)),
         fixedFields: DM.fields.filter(f => f.fixed),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
+        ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
     };
 
     if (DM.editingTemplateId) {
@@ -2043,10 +2056,54 @@ function saveTemplate() {
         DM.templates.push(tpl);
     }
     save();
-    toast('התבנית נשמרה!');
+
+    // Save to Firebase so external users can load via #fill/ link
+    if (typeof firebaseSaveTemplate === 'function') {
+        firebaseSaveTemplate(tpl);
+    }
+
+    showTemplateLinkSuccess(tpl);
+}
+
+function showTemplateLinkSuccess(tpl) {
+    const fillUrl = `${location.origin}${location.pathname}#fill/${tpl.id}`;
     resetEditor();
-    DM.view = 'templates';
-    render();
+    const main = document.getElementById('mainContent');
+    document.body.classList.remove('fullscreen-view');
+    renderSidebar();
+    main.innerHTML = `<div class="link-success-screen">
+        <button class="close-btn" onclick="switchView('templates')" style="position:absolute;top:16px;left:16px;background:none;border:none;font-size:1.5em;cursor:pointer;color:var(--text-light);">✕</button>
+        <div class="link-success-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#16a34a"/><polyline points="7 12 10 15 17 9" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 style="font-size:1.5em;font-weight:800;margin:16px 0 6px;">התבנית נשמרה!</h2>
+        <p style="color:var(--text-light);font-size:0.9em;margin-bottom:24px;">שתף את הקישור - כל מי שיפתח אותו יקבל עותק נפרד למילוי</p>
+        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">קישור למילוי תבנית:</div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px;">
+            <div style="display:flex;align-items:center;justify-content:center;padding:12px 16px;background:var(--bg);border-radius:10px;">
+                <button class="btn btn-primary" onclick="copySignLink(this,'${fillUrl}')" style="display:flex;align-items:center;gap:8px;padding:10px 24px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                    העתק קישור למילוי
+                </button>
+            </div>
+            <div style="text-align:center;font-size:0.78em;color:var(--text-light);direction:ltr;word-break:break-all;">${fillUrl}</div>
+        </div>
+        <div style="margin-top:20px;display:flex;gap:10px;">
+            <button class="btn btn-outline" onclick="switchView('templates')">חזור לתבניות</button>
+            <button class="btn btn-primary" onclick="switchView('home')">חזור לראשי</button>
+        </div>
+    </div>`;
+}
+
+function copyTemplateFillLink(btn, tplId) {
+    const url = `${location.origin}${location.pathname}#fill/${tplId}`;
+    navigator.clipboard.writeText(url).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> הועתק!';
+        btn.style.color = '#16a34a';
+        btn.style.borderColor = '#16a34a';
+        setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+    });
 }
 
 // ==================== SIGNING VIEW ====================
@@ -2754,6 +2811,30 @@ function signField(docId, fieldId) {
 function syncDocToFirebase(doc) {
     if (typeof firebaseUpdateDoc === 'function') {
         firebaseUpdateDoc(doc).catch(() => {});
+    }
+}
+
+async function syncOwnerDocsFromFirebase(ownerEmail) {
+    if (!smoovFirestoreReady || !smoovDb || !ownerEmail) return;
+    try {
+        const snapshot = await smoovDb.collection('smoov_docs')
+            .where('createdBy', '==', ownerEmail)
+            .get();
+        let added = 0;
+        snapshot.forEach(docSnap => {
+            const remoteDoc = docSnap.data();
+            const localIdx = DM.docs.findIndex(d => d.id === remoteDoc.id);
+            if (localIdx < 0) {
+                DM.docs.push(remoteDoc);
+                added++;
+            } else if (remoteDoc.status === 'completed' && DM.docs[localIdx].status !== 'completed') {
+                DM.docs[localIdx] = remoteDoc;
+                added++;
+            }
+        });
+        if (added > 0) { save(); render(); }
+    } catch (err) {
+        console.warn('Sync owner docs error:', err);
     }
 }
 
@@ -3503,6 +3584,71 @@ style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 document.head.appendChild(style);
 
 // Check URL hash for direct document signing link (e.g. #sign/dm_123456)
+let _fillingTemplate = false;
+
+async function loadAndCloneTemplate(tplId) {
+    if (_fillingTemplate) return;
+    _fillingTemplate = true;
+    try {
+        const main = document.getElementById('mainContent');
+        main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען תבנית...</div></div>';
+
+        // Try local first (owner testing their own link)
+        let tpl = DM.templates.find(t => t.id === tplId);
+
+        // If not found locally, load from Firebase
+        if (!tpl && typeof firebaseLoadTemplate === 'function') {
+            tpl = await firebaseLoadTemplate(tplId);
+        }
+
+        if (!tpl) {
+            main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><h2 style="margin-top:12px;">התבנית לא נמצאה</h2><p style="color:var(--text-light);">ייתכן שהתבנית נמחקה או שהקישור שגוי</p></div></div>';
+            return;
+        }
+
+        // Clone template into a NEW document
+        const docId = 'dm_' + Date.now();
+        const now = new Date().toISOString();
+        const newDoc = {
+            id: docId,
+            fileName: tpl.name || tpl.fileName || 'מסמך מתבנית',
+            docImage: tpl.docImage,
+            docPages: tpl.docPages || [],
+            pageHeights: tpl.pageHeights || [],
+            pageWidth: tpl.pageWidth || 0,
+            recipients: [],
+            fields: (tpl.fields || []).map(f => ({
+                ...f,
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                signedValue: null,
+                signatureData: null,
+                fileData: null,
+                value: f.fixed ? f.value : (f.type === 'checkbox' && f.defaultChecked ? '\u2713' : '')
+            })),
+            status: 'sent',
+            templateId: tplId,
+            templateName: tpl.name || '',
+            createdBy: tpl.createdBy || '',
+            ownerUid: tpl.ownerUid || '',
+            createdAt: now,
+            audit: [{ action: 'created', detail: 'נוצר מתבנית: ' + (tpl.name || ''), time: now }]
+        };
+
+        DM.docs.push(newDoc);
+        save();
+        if (typeof firebaseSaveDoc === 'function') firebaseSaveDoc(newDoc);
+
+        // Update hash to the new doc (prevents re-cloning on refresh)
+        location.hash = '#sign/' + docId;
+        openSign(docId);
+    } catch (err) {
+        console.error('Error cloning template:', err);
+        toast('שגיאה בטעינת התבנית', 'error');
+    } finally {
+        setTimeout(() => { _fillingTemplate = false; }, 500);
+    }
+}
+
 function checkUrlHash() {
     const hash = location.hash;
 
@@ -3510,6 +3656,14 @@ function checkUrlHash() {
     if (hash.startsWith('#share/')) {
         const linkId = hash.substring(7);
         openSharedDocument(linkId);
+        return true;
+    }
+
+    // Check for template fill links (e.g. #fill/tpl_123456)
+    if (hash.startsWith('#fill/')) {
+        if (_fillingTemplate) return true;
+        const tplId = hash.substring(6);
+        loadAndCloneTemplate(tplId);
         return true;
     }
 
@@ -3866,7 +4020,7 @@ function onAuthStateChanged(user) {
 
     // Signing links should work without auth
     const hash = window.location.hash;
-    const isSignLink = hash.startsWith('#sign/');
+    const isSignLink = hash.startsWith('#sign/') || hash.startsWith('#fill/');
 
     if (user) {
         // User is logged in
@@ -3885,6 +4039,7 @@ function onAuthStateChanged(user) {
         userMenu.style.display = '';
 
         if (!checkUrlHash()) render();
+        syncOwnerDocsFromFirebase(user.email);
     } else if (isSignLink) {
         // Allow signing without login
         loginScreen.style.display = 'none';
@@ -3907,7 +4062,7 @@ document.getElementById('mainContent').style.display = 'none';
 
 // For sign/share links: show content immediately without waiting for auth
 const _initHash = window.location.hash;
-if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/')) {
+if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/') || _initHash.startsWith('#fill/')) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainContent').style.display = '';
     document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';

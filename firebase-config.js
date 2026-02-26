@@ -123,3 +123,38 @@ async function firebaseUpdateDoc(doc) {
         return false;
     }
 }
+
+// ==================== TEMPLATES ====================
+async function firebaseSaveTemplate(tpl) {
+    if (!smoovFirestoreReady || !smoovDb) return false;
+    try {
+        await smoovDb.collection('smoov_templates').doc(tpl.id).set(JSON.parse(JSON.stringify(tpl)));
+        return true;
+    } catch (err) {
+        console.warn('Firestore save template error:', err);
+        return false;
+    }
+}
+
+async function firebaseLoadTemplate(tplId) {
+    if (!smoovFirestoreReady || !smoovDb) return null;
+    try {
+        const snap = await smoovDb.collection('smoov_templates').doc(tplId).get();
+        if (snap.exists) return snap.data();
+        return null;
+    } catch (err) {
+        console.warn('Firestore load template error:', err);
+        return null;
+    }
+}
+
+async function firebaseDeleteTemplate(tplId) {
+    if (!smoovFirestoreReady || !smoovDb) return false;
+    try {
+        await smoovDb.collection('smoov_templates').doc(tplId).delete();
+        return true;
+    } catch (err) {
+        console.warn('Firestore delete template error:', err);
+        return false;
+    }
+}
