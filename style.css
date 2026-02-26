@@ -131,8 +131,8 @@ input, select, textarea, button { font-family: var(--font); }
     font-size: 0.6em; color: var(--text-light); opacity: 0.6;
 }
 .sidebar-group-header.open .sidebar-arrow { transform: rotate(180deg); }
-.sidebar-group-items { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; padding: 0; }
-.sidebar-group-items.open { max-height: 500px; }
+.sidebar-group-items { display: none; padding: 0; }
+.sidebar-group-items.open { display: block; }
 .sidebar-group-items .sidebar-sub { min-height: 32px; }
 .sidebar-divider { height: 1px; background: var(--border); margin: 8px 14px; }
 
