@@ -4209,6 +4209,18 @@ function onAuthStateChanged(user) {
         loginScreen.style.display = 'none';
         appLayout.style.display = '';
 
+        // Filter docs/templates to only show current user's data
+        // Keep docs owned by this user OR docs they signed via fill links
+        const uid = user.uid;
+        const email = user.email;
+        DM.docs = DM.docs.filter(d =>
+            !d.ownerUid || d.ownerUid === uid || d.signerUid === uid ||
+            d.signerEmail === email || d.createdBy === email
+        );
+        DM.templates = DM.templates.filter(t =>
+            !t.ownerUid || t.ownerUid === uid || t.createdBy === email
+        );
+
         const isFillLink = hash.startsWith('#fill/');
         if (isFillLink) {
             // Fill-link signer: hide dashboard navigation, show only signing view
