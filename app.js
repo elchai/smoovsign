@@ -723,6 +723,7 @@ function useTemplate(id) {
         value: f.fixed ? f.value : (f.type === 'checkbox' && f.defaultChecked ? '✓' : '')
     }));
     DM.isTemplate = false;
+    DM._fromTemplate = true;
     DM.step = 2; // skip upload, go to recipients
     DM.view = 'create';
     render();
@@ -773,6 +774,7 @@ function resetEditor() {
     DM.editingTemplateId = null;
     DM.recipientSearch = '';
     DM._allowNoRecipients = false;
+    DM._fromTemplate = false;
 }
 
 // ==================== WIZARD ====================
@@ -1922,11 +1924,11 @@ function showLinkSuccess(doc) {
                 </button>
             </div>`}
         </div>
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
+        ${!DM._fromTemplate ? `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
             <h3 style="font-weight:700;margin-bottom:6px;">צור תבנית</h3>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">שלחת מסמך שאינו תבנית. חסוך זמן בפעם הבאה על ידי יצירת תבנית ממנו.</p>
             <button class="btn btn-outline" onclick="saveAsTemplateFromDoc('${doc.id}')">שמור כתבנית</button>
-        </div>
+        </div>` : ''}
         <div style="margin-top:20px;">
             <button class="btn btn-primary" onclick="resetEditor();DM.view='home';render();">חזור לראשי</button>
         </div>
