@@ -2209,7 +2209,7 @@ function openSign(docId) {
             render();
             return;
         }
-        // Logged-in signer (from #fill/ link) - set signer identity from Google account
+        // Logged-in signer (from #fill/ or #sign/ link) - set signer identity from Google account
         if (!DM._currentSigner) {
             DM._currentSigner = smoovCurrentUser.displayName || smoovCurrentUser.email || 'חותם';
             DM._currentSignerEmail = smoovCurrentUser.email || '';
@@ -3470,8 +3470,9 @@ function highlightNextField(doc) {
 }
 
 function completeSign(docId) {
+  try {
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) return;
+    if (!doc) { toast('המסמך לא נמצא', 'error'); return; }
     // Check expiration
     if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
         toast('תוקף המסמך פג', 'error'); return;
@@ -3518,7 +3519,13 @@ function completeSign(docId) {
     } else {
         // Sender/owner view: check all required fields
         const unfilled = (doc.fields || []).filter(f => f.required && !f.fixed && !f.signedValue && !f.value);
-        if (unfilled.length > 0) { toast(`נותרו ${unfilled.length} שדות חובה`, 'error'); return; }
+        if (unfilled.length > 0) {
+            console.log('Unfilled required fields:', unfilled.map(f => ({label: f.label, type: f.type, signedValue: f.signedValue, value: f.value})));
+            toast(`נותרו ${unfilled.length} שדות חובה למילוי`, 'error');
+            // Highlight first unfilled field
+            highlightNextField(doc);
+            return;
+        }
         (doc.recipients || []).forEach(r => { r.signed = true; r.signedAt = new Date().toISOString(); });
         doc.status = 'completed';
         doc.completedAt = new Date().toISOString();
@@ -3550,6 +3557,10 @@ function completeSign(docId) {
         DM._currentSignerEmail = null;
         switchView('home');
     }
+  } catch (err) {
+    console.error('completeSign error:', err);
+    toast('שגיאה באישור החתימה: ' + err.message, 'error');
+  }
 }
 
 // ==================== SHARE DOCUMENT ====================
@@ -3694,9 +3705,9 @@ async function loadAndCloneTemplate(tplId) {
         // Try local first (owner testing their own link)
         let tpl = DM.templates.find(t => t.id === tplId);
 
-        // If local template has no images, try loading from Firebase
-        if (tpl && !tpl.docImage && typeof storageDownloadImages === 'function') {
-            const imgs = await storageDownloadImages(tplId);
+        // If local template has no images, try loading from Firebase chunks
+        if (tpl && !tpl.docImage && typeof _loadImageChunks === 'function') {
+            const imgs = await _loadImageChunks(tplId);
             if (imgs) { tpl.docImage = imgs.docImage; tpl.docPages = imgs.docPages || []; }
         }
 

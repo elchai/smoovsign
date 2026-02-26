@@ -15,7 +15,6 @@ const smoovFirebaseConfig = {
 
 let smoovDb = null;
 let smoovAuth = null;
-let smoovStorage = null;
 let smoovFirestoreReady = false;
 let smoovCurrentUser = null;
 
@@ -27,7 +26,6 @@ function initSmoovFirebase() {
         }
         smoovDb = firebase.firestore();
         smoovAuth = firebase.auth();
-        smoovStorage = firebase.storage();
         smoovFirestoreReady = true;
         console.log('SmoovSign Firebase initialized');
 
@@ -91,61 +89,127 @@ function closeUserDropdown() {
     if (dd) dd.classList.add('hidden');
 }
 
-// ==================== FIREBASE STORAGE (images) ====================
-async function storageUploadImages(id, docImage, docPages) {
-    if (!smoovStorage) return false;
+// ==================== IMAGE CHUNKS (Firestore subcollection) ====================
+// Splits large base64 strings into ~750KB chunks stored in Firestore subcollection
+const _CHUNK_SIZE = 750000; // 750KB per chunk (Firestore limit is ~1MB per doc)
+
+async function _saveImageChunks(docId, docImage, docPages) {
+    if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        // Upload main image
+        const chunksRef = smoovDb.collection('smoov_docs').doc(docId).collection('img_chunks');
+        const batch = smoovDb.batch();
+        let chunkIdx = 0;
+
+        // Save docImage in chunks
         if (docImage) {
-            const ref = smoovStorage.ref(`docs/${id}/docImage`);
-            await ref.putString(docImage, 'data_url');
+            for (let i = 0; i < docImage.length; i += _CHUNK_SIZE) {
+                batch.set(chunksRef.doc('c_' + chunkIdx), {
+                    type: 'docImage',
+                    idx: Math.floor(i / _CHUNK_SIZE),
+                    data: docImage.substring(i, i + _CHUNK_SIZE)
+                });
+                chunkIdx++;
+            }
         }
-        // Upload pages
+
+        // Save each page in chunks
         if (docPages && docPages.length > 0) {
-            for (let i = 0; i < docPages.length; i++) {
-                if (docPages[i]) {
-                    const ref = smoovStorage.ref(`docs/${id}/page_${i}`);
-                    await ref.putString(docPages[i], 'data_url');
+            for (let p = 0; p < docPages.length; p++) {
+                if (!docPages[p]) continue;
+                const page = docPages[p];
+                for (let i = 0; i < page.length; i += _CHUNK_SIZE) {
+                    batch.set(chunksRef.doc('c_' + chunkIdx), {
+                        type: 'page',
+                        page: p,
+                        idx: Math.floor(i / _CHUNK_SIZE),
+                        data: page.substring(i, i + _CHUNK_SIZE)
+                    });
+                    chunkIdx++;
                 }
             }
-            // Save page count for loading
-            const metaRef = smoovStorage.ref(`docs/${id}/_meta.json`);
-            await metaRef.putString(JSON.stringify({ pageCount: docPages.length }), 'raw', { contentType: 'application/json' });
+        }
+
+        // Save meta (how many chunks total, page count)
+        batch.set(chunksRef.doc('_meta'), {
+            totalChunks: chunkIdx,
+            pageCount: (docPages && docPages.length) || 0,
+            hasDocImage: !!docImage
+        });
+
+        // Firestore batch limit is 500 writes. If more, use multiple batches.
+        if (chunkIdx <= 498) {
+            await batch.commit();
+        } else {
+            // Fallback: write sequentially for very large docs
+            const writes = [];
+            if (docImage) {
+                for (let i = 0; i < docImage.length; i += _CHUNK_SIZE) {
+                    writes.push(chunksRef.doc('img_' + writes.length).set({
+                        type: 'docImage', idx: Math.floor(i / _CHUNK_SIZE),
+                        data: docImage.substring(i, i + _CHUNK_SIZE)
+                    }));
+                }
+            }
+            if (docPages) {
+                for (let p = 0; p < docPages.length; p++) {
+                    if (!docPages[p]) continue;
+                    for (let i = 0; i < docPages[p].length; i += _CHUNK_SIZE) {
+                        writes.push(chunksRef.doc('img_' + writes.length).set({
+                            type: 'page', page: p, idx: Math.floor(i / _CHUNK_SIZE),
+                            data: docPages[p].substring(i, i + _CHUNK_SIZE)
+                        }));
+                    }
+                }
+            }
+            writes.push(chunksRef.doc('_meta').set({
+                totalChunks: writes.length, pageCount: (docPages && docPages.length) || 0, hasDocImage: !!docImage
+            }));
+            await Promise.all(writes);
         }
         return true;
     } catch (err) {
-        console.error('Storage upload error:', err.code, err.message);
+        console.warn('Image chunks save error:', err);
         return false;
     }
 }
 
-async function storageDownloadImages(id) {
-    if (!smoovStorage) return null;
+async function _loadImageChunks(docId) {
+    if (!smoovFirestoreReady || !smoovDb) return null;
     try {
+        const chunksRef = smoovDb.collection('smoov_docs').doc(docId).collection('img_chunks');
+        const metaSnap = await chunksRef.doc('_meta').get();
+        if (!metaSnap.exists) return null;
+
+        const snapshot = await chunksRef.get();
+        if (snapshot.empty) return null;
+
+        const chunks = [];
+        snapshot.forEach(doc => {
+            if (doc.id !== '_meta') chunks.push(doc.data());
+        });
+
+        // Reassemble docImage
         let docImage = null;
-        let docPages = [];
-        // Download main image
-        try {
-            const url = await smoovStorage.ref(`docs/${id}/docImage`).getDownloadURL();
-            const resp = await fetch(url);
-            docImage = await resp.text();
-        } catch (e) { /* no main image */ }
-        // Check for pages
-        try {
-            const metaUrl = await smoovStorage.ref(`docs/${id}/_meta.json`).getDownloadURL();
-            const metaResp = await fetch(metaUrl);
-            const meta = await metaResp.json();
-            for (let i = 0; i < meta.pageCount; i++) {
-                try {
-                    const pageUrl = await smoovStorage.ref(`docs/${id}/page_${i}`).getDownloadURL();
-                    const pageResp = await fetch(pageUrl);
-                    docPages.push(await pageResp.text());
-                } catch (e) { docPages.push(null); }
+        const imgChunks = chunks.filter(c => c.type === 'docImage').sort((a, b) => a.idx - b.idx);
+        if (imgChunks.length > 0) {
+            docImage = imgChunks.map(c => c.data).join('');
+        }
+
+        // Reassemble pages
+        const docPages = [];
+        const meta = metaSnap.data();
+        for (let p = 0; p < (meta.pageCount || 0); p++) {
+            const pageChunks = chunks.filter(c => c.type === 'page' && c.page === p).sort((a, b) => a.idx - b.idx);
+            if (pageChunks.length > 0) {
+                docPages.push(pageChunks.map(c => c.data).join(''));
+            } else {
+                docPages.push(null);
             }
-        } catch (e) { /* no pages */ }
+        }
+
         return (docImage || docPages.length > 0) ? { docImage, docPages } : null;
     } catch (err) {
-        console.warn('Storage download error:', err);
+        console.warn('Image chunks load error:', err);
         return null;
     }
 }
@@ -162,11 +226,11 @@ function _stripImages(obj) {
 async function firebaseSaveDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        // Save images to Storage, metadata to Firestore
-        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
-            storageUploadImages(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image upload bg error:', e));
-        }
         await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
+        // Save images as chunks in background
+        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
+            _saveImageChunks(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image chunks bg error:', e));
+        }
         return true;
     } catch (err) {
         console.warn('Firestore save doc error:', err);
@@ -180,8 +244,8 @@ async function firebaseLoadDoc(docId) {
         const snap = await smoovDb.collection('smoov_docs').doc(docId).get();
         if (!snap.exists) return null;
         const data = snap.data();
-        // Load images from Storage
-        const imgs = await storageDownloadImages(docId);
+        // Load images from chunks
+        const imgs = await _loadImageChunks(docId);
         if (imgs) {
             if (imgs.docImage) data.docImage = imgs.docImage;
             if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
@@ -196,11 +260,10 @@ async function firebaseLoadDoc(docId) {
 async function firebaseUpdateDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        // Upload images if present
-        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
-            storageUploadImages(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image upload bg error:', e));
-        }
         await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
+        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
+            _saveImageChunks(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image chunks bg error:', e));
+        }
         return true;
     } catch (err) {
         console.warn('Firestore update doc error:', err);
@@ -216,11 +279,11 @@ async function firebaseSaveTemplate(tpl) {
         // Save metadata to Firestore first (fast)
         await smoovDb.collection('smoov_docs').doc(tpl.id).set(_stripImages(tpl));
         console.log('Template metadata saved to Firebase:', tpl.id);
-        // Upload images to Storage in background (slow, don't block)
+        // Save images as chunks (wait for completion so fill links work immediately)
         if (tpl.docImage || (tpl.docPages && tpl.docPages.length)) {
-            storageUploadImages(tpl.id, tpl.docImage, tpl.docPages)
-                .then(ok => { if (ok) console.log('Template images uploaded:', tpl.id); })
-                .catch(e => console.warn('Template image upload error:', e));
+            const ok = await _saveImageChunks(tpl.id, tpl.docImage, tpl.docPages);
+            if (ok) console.log('Template images saved:', tpl.id);
+            else console.warn('Template image save failed:', tpl.id);
         }
         return true;
     } catch (err) {
@@ -235,8 +298,8 @@ async function firebaseLoadTemplate(tplId) {
         const snap = await smoovDb.collection('smoov_docs').doc(tplId).get();
         if (!snap.exists) { console.warn('Template not found in Firebase:', tplId); return null; }
         const data = snap.data();
-        // Load images from Storage
-        const imgs = await storageDownloadImages(tplId);
+        // Load images from chunks
+        const imgs = await _loadImageChunks(tplId);
         if (imgs) {
             if (imgs.docImage) data.docImage = imgs.docImage;
             if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
@@ -252,6 +315,14 @@ async function firebaseLoadTemplate(tplId) {
 async function firebaseDeleteTemplate(tplId) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
+        // Delete chunks subcollection
+        try {
+            const chunksRef = smoovDb.collection('smoov_docs').doc(tplId).collection('img_chunks');
+            const snap = await chunksRef.get();
+            const batch = smoovDb.batch();
+            snap.forEach(doc => batch.delete(doc.ref));
+            if (!snap.empty) await batch.commit();
+        } catch (e) { /* chunks may not exist */ }
         await smoovDb.collection('smoov_docs').doc(tplId).delete();
         return true;
     } catch (err) {
