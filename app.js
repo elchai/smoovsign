@@ -690,11 +690,18 @@ function generateId() {
 }
 
 // ==================== TEMPLATES ====================
+if (!DM._tplSelected) DM._tplSelected = {};
+
 function renderTemplates(el) {
+    const selCount = Object.values(DM._tplSelected).filter(Boolean).length;
+    const allSelected = DM.templates.length > 0 && selCount === DM.templates.length;
     el.innerHTML = `<div class="dashboard">
         <div class="dashboard-header">
             <h1>תבניות מסמכים</h1>
-            <button class="btn btn-primary" onclick="newTemplate()">+ תבנית חדשה</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+                ${selCount > 0 ? `<button class="btn btn-sm" style="background:var(--danger);color:white;" onclick="deleteSelectedTemplates()">מחק ${selCount} תבניות</button>` : ''}
+                <button class="btn btn-primary" onclick="newTemplate()">+ תבנית חדשה</button>
+            </div>
         </div>
         ${DM.templates.length === 0 ? `
             <div class="empty-state">
@@ -703,8 +710,14 @@ function renderTemplates(el) {
                 <p>צור תבנית עם שדות מוכנים ושדות למילוי - חוסך זמן בכל שליחה!</p>
                 <button class="btn btn-primary btn-lg" onclick="newTemplate()">+ צור תבנית</button>
             </div>
-        ` : `<div class="doc-list">${DM.templates.map(t => `
-            <div class="template-card">
+        ` : `
+            <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="tplSelectAll" ${allSelected ? 'checked' : ''} onchange="toggleAllTemplates(this.checked)" style="width:18px;height:18px;cursor:pointer;">
+                <label for="tplSelectAll" style="font-size:0.82em;color:var(--text-light);cursor:pointer;">בחר הכל</label>
+            </div>
+            <div class="doc-list">${DM.templates.map(t => `
+            <div class="template-card" style="${DM._tplSelected[t.id] ? 'background:var(--primary-light);' : ''}">
+                <input type="checkbox" ${DM._tplSelected[t.id] ? 'checked' : ''} onchange="toggleTemplateSelect('${t.id}', this.checked)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;">
                 <div class="template-icon" style="background:var(--primary-light);color:var(--primary);">${ICO.doc}</div>
                 <div class="doc-info">
                     <h3>${t.name || 'תבנית ללא שם'}</h3>
@@ -722,6 +735,29 @@ function renderTemplates(el) {
             </div>
         `).join('')}</div>`}
     </div>`;
+}
+
+function toggleTemplateSelect(id, checked) {
+    DM._tplSelected[id] = checked;
+    render();
+}
+
+function toggleAllTemplates(checked) {
+    DM.templates.forEach(t => { DM._tplSelected[t.id] = checked; });
+    render();
+}
+
+function deleteSelectedTemplates() {
+    const ids = Object.keys(DM._tplSelected).filter(id => DM._tplSelected[id]);
+    if (ids.length === 0) return;
+    if (!confirm('למחוק ' + ids.length + ' תבניות?')) return;
+    ids.forEach(id => {
+        if (typeof firebaseDeleteTemplate === 'function') firebaseDeleteTemplate(id);
+    });
+    DM.templates = DM.templates.filter(t => !DM._tplSelected[t.id]);
+    DM._tplSelected = {};
+    save();
+    render();
 }
 
 function deleteTemplate(id) {
