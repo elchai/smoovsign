@@ -51,6 +51,8 @@ const ICO = {
     user: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
     id: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
     checkbox: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 11 12 14 22 4"/></svg>',
+    share: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
+    link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>',
 };
 
 function save() {
@@ -106,7 +108,7 @@ function renderSidebar() {
         <button class="sidebar-group-header ${docsOpen ? 'open' : ''}" onclick="toggleSidebarGroup('docs')">
             <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
             מסמכים
-            <span class="sidebar-arrow">▼</span>
+            <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
         <div class="sidebar-group-items ${docsOpen ? 'open' : ''}">
             <button class="sidebar-item sidebar-sub ${v === 'docs_all' ? 'active' : ''}" onclick="switchView('docs_all')">כל המסמכים</button>
@@ -122,7 +124,7 @@ function renderSidebar() {
         <button class="sidebar-group-header ${tplOpen ? 'open' : ''}" onclick="toggleSidebarGroup('templates')">
             <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
             תבניות
-            <span class="sidebar-arrow">▼</span>
+            <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
         <div class="sidebar-group-items ${tplOpen ? 'open' : ''}">
             <button class="sidebar-item sidebar-sub ${v === 'templates' ? 'active' : ''}" onclick="switchView('templates')">טפסים</button>
@@ -189,6 +191,7 @@ function render() {
     else if (v === 'contacts') renderContacts(main);
     else if (v === 'create') renderWizard(main);
     else if (v === 'sign') renderSignView(main);
+    else if (v === 'shared') renderSharedDocumentView(main);
 
     // Restore scroll positions after re-render
     requestAnimationFrame(() => {
@@ -357,6 +360,7 @@ function renderDocRows(docs, mode) {
             <div class="dtc dtc-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm" onclick="openSign('${doc.id}')" title="צפייה">${ICO.eye}</button>
                 <button class="btn btn-ghost btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורדה">${ICO.download}</button>
+                <button class="btn btn-ghost btn-sm" onclick="openShareModal('${doc.id}')" title="שיתוף">${ICO.share}</button>
                 ${mode === 'waiting' ? `<button class="btn btn-primary btn-sm" onclick="openSign('${doc.id}')">מילוי טופס</button>` : ''}
                 ${mode === 'deleted' ? `<button class="btn btn-outline btn-sm" onclick="restoreDoc('${doc.id}')">שחזור</button>` : ''}
             </div>
@@ -489,6 +493,183 @@ function deleteContact(id) {
     render();
 }
 
+// ==================== SHARE FUNCTIONALITY ====================
+function openShareModal(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'shareModal';
+    overlay.innerHTML = `<div class="modal-card" style="max-width:500px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="font-weight:700;margin:0;">שיתוף מסמך</h3>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('shareModal').remove()" style="font-size:1.1em;">✕</button>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">שם המסמך</label>
+            <div style="padding:8px 12px;background:var(--bg-light);border-radius:8px;font-size:0.9em;">${doc.fileName || 'מסמך ללא שם'}</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">קישור ציבורי</label>
+            <div style="display:flex;gap:8px;">
+                <input type="text" class="form-input" id="publicLink" readonly placeholder="יש ליצור קישור..." dir="ltr" style="flex:1;">
+                <button class="btn btn-outline" onclick="copyToClipboard(document.getElementById('publicLink').value)" id="copyBtn" disabled>העתק</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">הגדרות שיתוף</label>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
+                    <input type="checkbox" id="requirePassword">
+                    הגנה בסיסמה
+                </label>
+                <input type="password" class="form-input" id="sharePassword" placeholder="סיסמה (אופציונלי)" style="display:none;">
+
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
+                    <input type="checkbox" id="setExpiry">
+                    הגדרת תוקף
+                </label>
+                <input type="datetime-local" class="form-input" id="expiryDate" style="display:none;">
+
+                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
+                    <input type="checkbox" id="limitViews">
+                    הגבלת צפיות
+                </label>
+                <input type="number" class="form-input" id="maxViews" placeholder="מספר צפיות מקסימלי" min="1" max="100" style="display:none;">
+            </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+            <button class="btn btn-outline" onclick="document.getElementById('shareModal').remove()">ביטול</button>
+            <button class="btn btn-primary" onclick="generateShareLink('${docId}')">יצירת קישור</button>
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Add event listeners for checkboxes
+    document.getElementById('requirePassword').addEventListener('change', function() {
+        document.getElementById('sharePassword').style.display = this.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('setExpiry').addEventListener('change', function() {
+        document.getElementById('expiryDate').style.display = this.checked ? 'block' : 'none';
+    });
+
+    document.getElementById('limitViews').addEventListener('change', function() {
+        document.getElementById('maxViews').style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Check if link already exists
+    if (doc.publicShare && doc.publicShare.linkId) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const publicUrl = `${baseUrl}#share/${doc.publicShare.linkId}`;
+        document.getElementById('publicLink').value = publicUrl;
+        document.getElementById('copyBtn').disabled = false;
+        document.querySelector('.btn.btn-primary').textContent = 'עדכון קישור';
+    }
+}
+
+function generateShareLink(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+
+    // Generate unique link ID
+    const linkId = generateId();
+
+    // Collect share settings
+    const requirePassword = document.getElementById('requirePassword').checked;
+    const password = requirePassword ? document.getElementById('sharePassword').value : null;
+    const setExpiry = document.getElementById('setExpiry').checked;
+    const expiry = setExpiry ? document.getElementById('expiryDate').value : null;
+    const limitViews = document.getElementById('limitViews').checked;
+    const maxViews = limitViews ? parseInt(document.getElementById('maxViews').value) || null : null;
+
+    if (requirePassword && !password) {
+        toast('יש להזין סיסמה', 'error');
+        return;
+    }
+
+    if (setExpiry && !expiry) {
+        toast('יש להגדיר תאריך תוקף', 'error');
+        return;
+    }
+
+    if (limitViews && (!maxViews || maxViews < 1)) {
+        toast('יש להזין מספר צפיות תקין', 'error');
+        return;
+    }
+
+    // Create share object
+    const shareSettings = {
+        linkId: linkId,
+        createdAt: new Date().toISOString(),
+        password: password,
+        expiresAt: expiry ? new Date(expiry).toISOString() : null,
+        maxViews: maxViews,
+        viewCount: 0,
+        isActive: true
+    };
+
+    // Save to document
+    doc.publicShare = shareSettings;
+    save();
+
+    // Save to Firebase if available
+    if (window.db && firebase.auth().currentUser) {
+        const shareDoc = {
+            docId: doc.id,
+            linkId: linkId,
+            docData: {
+                fileName: doc.fileName,
+                docImage: doc.docImage,
+                docPages: doc.docPages,
+                fields: doc.fields,
+                recipients: doc.recipients
+            },
+            settings: shareSettings,
+            ownerId: firebase.auth().currentUser.uid
+        };
+
+        window.db.collection('shared_documents').doc(linkId).set(shareDoc)
+            .catch(err => console.error('Error saving to Firebase:', err));
+    }
+
+    // Update UI
+    const baseUrl = window.location.origin + window.location.pathname;
+    const publicUrl = `${baseUrl}#share/${linkId}`;
+    document.getElementById('publicLink').value = publicUrl;
+    document.getElementById('copyBtn').disabled = false;
+    document.querySelector('.btn.btn-primary').textContent = 'עדכון קישור';
+
+    toast('קישור נוצר בהצלחה!', 'success');
+}
+
+function copyToClipboard(text) {
+    if (!text) return;
+
+    navigator.clipboard.writeText(text).then(() => {
+        toast('הקישור הועתק!', 'success');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        toast('הקישור הועתק!', 'success');
+    });
+}
+
+function generateId() {
+    return 'sh_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+}
+
 // ==================== TEMPLATES ====================
 function renderTemplates(el) {
     el.innerHTML = `<div class="dashboard">
@@ -535,10 +716,10 @@ function useTemplate(id) {
     DM.pageHeights = tpl.pageHeights || [];
     DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
-    // Copy template fields - fixed ones keep their value, dynamic ones are empty
+    // Copy template fields - fixed ones keep their value, dynamic ones are empty (except checkboxes with defaultChecked)
     DM.fields = (tpl.fields || []).map(f => ({
         ...f, id: Date.now() + Math.random(),
-        value: f.fixed ? f.value : ''
+        value: f.fixed ? f.value : (f.type === 'checkbox' && f.defaultChecked ? '✓' : '')
     }));
     DM.isTemplate = false;
     DM.step = 2; // skip upload, go to recipients
@@ -689,8 +870,8 @@ function renderUpload(el) {
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     </div>
                     <span style="font-size:1.1em;font-weight:700;">הוספת מסמך</span>
-                    <span style="font-size:0.82em;color:var(--text-light);margin-top:4px;">PDF, JPG, PNG - גרור או לחץ</span>
-                    <input type="file" style="display:none;" accept=".pdf,image/*" onchange="handleFileUpload(event)" id="fileInput">
+                    <span style="font-size:0.82em;color:var(--text-light);margin-top:4px;">PDF, Word, JPG, PNG - גרור או לחץ</span>
+                    <input type="file" style="display:none;" accept=".pdf,.doc,.docx,image/*" onchange="handleFileUpload(event)" id="fileInput">
                 </label>`}
         </div>
     </div>`;
@@ -710,10 +891,17 @@ function handleFileUpload(e) {
 }
 
 async function processFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const supportedTypes = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+    if (!file.type.startsWith('image/') && !['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type) && !supportedTypes.includes(ext)) {
+        toast('סוג קובץ לא נתמך. ניתן להעלות: PDF, Word, JPG, PNG', 'error');
+        return;
+    }
     DM.fileName = file.name.replace(/\.\w+$/, '');
+    const dz = document.getElementById('dropzone');
+
     if (file.type === 'application/pdf') {
         if (!window.pdfjsLib) { toast('PDF.js לא נטען', 'error'); return; }
-        const dz = document.getElementById('dropzone');
         if (dz) dz.innerHTML = '<div style="text-align:center"><div style="width:24px;height:24px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;"></div>טוען PDF...</div>';
         try {
             const buf = await file.arrayBuffer();
@@ -761,10 +949,38 @@ async function processFile(file) {
             toast('שגיאה בטעינת PDF', 'error');
             render();
         }
-    } else {
+    } else if (ext === 'docx' || ext === 'doc' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.type === 'application/msword') {
+        if (ext === 'doc') { toast('פורמט .doc ישן - יש לשמור כ-.docx ולנסות שוב', 'error'); return; }
+        if (!window.mammoth) { toast('ספריית Word לא נטענה', 'error'); return; }
+        if (dz) dz.innerHTML = '<div style="text-align:center"><div style="width:24px;height:24px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;"></div>טוען מסמך Word...</div>';
+        try {
+            const buf = await file.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+            // Render HTML to canvas via hidden container
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;padding:40px 50px;background:white;font-family:Heebo,sans-serif;font-size:14px;line-height:1.8;direction:rtl;color:#000;';
+            container.innerHTML = result.value;
+            document.body.appendChild(container);
+            // Use html2canvas from html2pdf bundle
+            const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            document.body.removeChild(container);
+            DM.docImage = canvas.toDataURL('image/jpeg', 0.85);
+            DM.docPages = [DM.docImage];
+            DM.pageHeights = [canvas.height];
+            DM.pageWidth = canvas.width;
+            toast('מסמך Word נטען בהצלחה');
+            render();
+        } catch (err) {
+            console.error('Word load error:', err);
+            toast('שגיאה בטעינת מסמך Word', 'error');
+            render();
+        }
+    } else if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = ev => { DM.docImage = ev.target.result; render(); };
         reader.readAsDataURL(file);
+    } else {
+        toast('סוג קובץ לא נתמך. ניתן להעלות: PDF, Word, JPG, PNG', 'error');
     }
 }
 
@@ -1059,7 +1275,8 @@ function setupCanvasDrop() {
             w: defaultW, h: defaultH,
             required: true,
             assigneeId: assignee ? assignee.id : null,
-            fixed: DM.isTemplate ? (DM._fieldFixed || false) : false
+            fixed: DM.isTemplate ? (DM._fieldFixed || false) : false,
+            defaultChecked: false
         };
         DM.fields.push(f);
         DM.selectedFieldId = f.id;
@@ -1099,6 +1316,13 @@ function renderFieldProps(f) {
                     <option value="file" ${f.type === 'file' ? 'selected' : ''}>צירוף קובץ</option>
                 </select>
             </div>
+            ${f.type === 'checkbox' ? `
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.85em;cursor:pointer;">
+                    <input type="checkbox" ${f.defaultChecked ? 'checked' : ''} onchange="updateField(${f.id},'defaultChecked',this.checked)">
+                    <strong>מסומן כברירת מחדל</strong>
+                </label>
+            </div>` : ''}
             ${DM.isTemplate ? `<div class="form-group">
                 <label style="display:flex;align-items:center;gap:6px;font-size:0.85em;cursor:pointer;">
                     <input type="checkbox" ${f.fixed ? 'checked' : ''} onchange="updateField(${f.id},'fixed',this.checked)">
@@ -1201,7 +1425,8 @@ function onCanvasClick(e) {
         w: defaultW, h: defaultH,
         required: true,
         assigneeId: assignee ? assignee.id : null,
-        fixed: DM.isTemplate ? (DM._fieldFixed || false) : false
+        fixed: DM.isTemplate ? (DM._fieldFixed || false) : false,
+        defaultChecked: false
     };
     DM.fields.push(f);
     DM.selectedFieldId = f.id;
@@ -1223,7 +1448,17 @@ function deselectField(e) {
         render();
     }
 }
-function updateField(id, key, val) { const f = DM.fields.find(x => x.id === id); if (f) { f[key] = val; render(); } }
+function updateField(id, key, val) {
+    const f = DM.fields.find(x => x.id === id);
+    if (f) {
+        f[key] = val;
+        // אם משנים את defaultChecked, מעדכנים את הערך בהתאם
+        if (key === 'defaultChecked' && f.type === 'checkbox') {
+            f.value = val ? '✓' : '';
+        }
+        render();
+    }
+}
 function deleteField(id) { DM.fields = DM.fields.filter(f => f.id !== id); DM.selectedFieldId = null; render(); }
 function duplicateField(id) {
     const f = DM.fields.find(x => x.id === id);
@@ -1576,7 +1811,8 @@ function renderSend(el) {
                     <label class="form-label" style="margin-bottom:8px;">נמענים:</label>
                     ${DM.recipients.map(r => {
                         const c = DM.fieldColors[r.colorIndex % DM.fieldColors.length];
-                        const fc = DM.fields.filter(f => f.assigneeId === r.id).length;
+                        const rfc = DM.fields.filter(f => f.assigneeId === r.id).length;
+                        const fc = rfc > 0 ? rfc : DM.fields.filter(f => !f.fixed).length;
                         return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:6px;">
                             <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};flex-shrink:0;"></span>
                             <span style="font-weight:600;font-size:0.88em;">${r.name || 'ללא שם'}</span>
@@ -1860,7 +2096,7 @@ function verifySigner(docId) {
 }
 
 // Track current field index for guided navigation
-if (!DM._signFieldIdx) DM._signFieldIdx = -1;
+if (DM._signFieldIdx == null) DM._signFieldIdx = -1;
 
 function renderSignView(el) {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
@@ -2004,8 +2240,10 @@ function renderSignView(el) {
                     ${(doc.recipients || []).map(r => {
                         const c = DM.fieldColors[(r.colorIndex || 0) % DM.fieldColors.length];
                         const rFields = (doc.fields || []).filter(f => f.assigneeId === r.id);
-                        const signed = rFields.filter(f => f.signedValue).length;
-                        const rpct = rFields.length > 0 ? Math.round((signed / rFields.length) * 100) : 0;
+                        const allFields = rFields.length > 0 ? rFields : (doc.fields || []).filter(f => !f.fixed);
+                        const signed = allFields.filter(f => f.signedValue).length;
+                        const total = allFields.length;
+                        const rpct = total > 0 ? Math.round((signed / total) * 100) : 0;
                         return `<div class="recipient-status-card">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                                 <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
@@ -2014,7 +2252,7 @@ function renderSignView(el) {
                             </div>
                             <div class="mini-progress"><div class="mini-progress-fill" style="width:${rpct}%;background:${c.fill};"></div></div>
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-                                <span style="font-size:0.72em;color:var(--text-light);">${signed}/${rFields.length} שדות</span>
+                                <span style="font-size:0.72em;color:var(--text-light);">${signed}/${total} שדות</span>
                                 ${!r.signed && r.phone ? `<button class="btn btn-ghost" style="font-size:0.68em;padding:2px 6px;display:flex;align-items:center;gap:3px;" onclick="event.stopPropagation();sendReminder('${doc.id}','${r.id}')">${ICO.bell} תזכורת</button>` : ''}
                             </div>
                         </div>`;
@@ -2075,6 +2313,8 @@ function highlightNextFieldById(fieldId) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             el.classList.add('pulse');
             setTimeout(() => el.classList.remove('pulse'), 2000);
+            // Auto-trigger the field on mobile for better UX
+            setTimeout(() => el.click(), 600);
         }
     }, 300);
 }
@@ -2190,49 +2430,73 @@ function sendReminder(docId, recipientId) {
     toast(`תזכורת נשלחה ל-${r.name}`);
 }
 
-// Download signed document as PDF
+// Download signed document as PDF (html2pdf.js - pixel-perfect DOM rendering with RTL support)
 async function downloadSignedPDF(docId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
     toast('מכין PDF להורדה...', 'info');
 
     try {
-        // Pre-load all signature images
-        const sigFields = (doc.fields || []).filter(f => f.signatureData);
-        const sigImages = {};
-        await Promise.all(sigFields.map(async f => {
-            try { sigImages[f.id] = await loadImage(f.signatureData); } catch(e) {}
-        }));
+        const EDITOR_W = 800; // fields positioned on 800px-wide editor
+        const hasMultiPage = doc.docPages && doc.docPages.length > 1;
+        const pages = hasMultiPage ? doc.docPages : [doc.docImage];
+        const pageHeights = doc.pageHeights || [];
 
-        // Pre-load all file attachment images
-        const fileFields = (doc.fields || []).filter(f => f.fileData);
-        const fileImages = {};
-        await Promise.all(fileFields.map(async f => {
-            try { fileImages[f.id] = await loadImage(f.fileData); } catch(e) {}
-        }));
+        // Build a hidden DOM container that reproduces the signed document
+        const container = document.createElement('div');
+        container.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;background:#fff;direction:rtl;font-family:Heebo,sans-serif;';
 
-        // Helper: draw fields onto a canvas within a y-range
-        function drawFields(ctx, scale, yOffset, pageH) {
+        let yAccum = 0;
+        const pageElements = [];
+
+        for (let i = 0; i < pages.length; i++) {
+            const pageDiv = document.createElement('div');
+            pageDiv.style.cssText = `position:relative;width:${EDITOR_W}px;overflow:hidden;background:#fff;`;
+            if (i > 0) pageDiv.style.pageBreakBefore = 'always';
+
+            // Page background image
+            const imgEl = document.createElement('img');
+            imgEl.src = pages[i];
+            imgEl.style.cssText = 'width:100%;display:block;';
+            pageDiv.appendChild(imgEl);
+
+            // Field Y range for this page
+            const pgH = pageHeights[i] || 99999;
+            const yStart = yAccum;
+            const yEnd = yStart + pgH;
+
+            // Overlay signed fields
             (doc.fields || []).forEach(f => {
                 const val = f.signedValue || f.value || '';
                 if (!val && !f.signatureData && !f.fileData) return;
-                const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
-                // Check if field is within this page's y-range
-                if (fy + fh < yOffset || fy > yOffset + pageH) return;
-                const adjY = fy - yOffset;
-                if (f.signatureData && sigImages[f.id]) {
-                    ctx.drawImage(sigImages[f.id], fx, adjY, fw, fh);
-                } else if (f.fileData && fileImages[f.id]) {
-                    ctx.drawImage(fileImages[f.id], fx, adjY, fw, fh);
+                // Check if field belongs to this page
+                if (f.y + f.h < yStart || f.y >= yEnd) return;
+
+                const fieldDiv = document.createElement('div');
+                fieldDiv.style.cssText = `position:absolute;left:${f.x}px;top:${f.y - yStart}px;width:${f.w}px;height:${f.h}px;display:flex;align-items:center;justify-content:center;overflow:hidden;`;
+
+                if (f.signatureData) {
+                    const sigImg = document.createElement('img');
+                    sigImg.src = f.signatureData;
+                    sigImg.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+                    fieldDiv.appendChild(sigImg);
+                } else if (f.fileData) {
+                    const fileImg = document.createElement('img');
+                    fileImg.src = f.fileData;
+                    fileImg.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+                    fieldDiv.appendChild(fileImg);
                 } else if (val) {
-                    ctx.fillStyle = '#1e293b';
-                    ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
-                    ctx.textBaseline = 'middle';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(val, fx + fw / 2, adjY + fh / 2, fw - 4);
+                    fieldDiv.style.fontFamily = 'Heebo, Segoe UI, Arial, sans-serif';
+                    fieldDiv.style.fontSize = '14px';
+                    fieldDiv.style.fontWeight = 'bold';
+                    fieldDiv.style.color = '#1e293b';
+                    fieldDiv.style.textAlign = 'center';
+                    fieldDiv.style.direction = 'rtl';
+                    fieldDiv.textContent = val;
                 }
+
+                pageDiv.appendChild(fieldDiv);
             });
-        }
 
         // Helper: safely save PDF with fallback
         function safePdfSave(pdf, fileName) {
@@ -2325,7 +2589,6 @@ async function downloadSignedPDF(docId) {
             safePdfSave(pdf, doc.fileName);
         } else {
             // Single page or legacy document (no page info)
-            // Limit canvas size for browser compatibility
             const limited = limitedCanvas(mainImg, 3000);
             const canvas = limited.canvas || document.createElement('canvas');
             if (!limited.canvas) {
@@ -2336,81 +2599,121 @@ async function downloadSignedPDF(docId) {
             const ctx = canvas.getContext('2d');
             const exportScale = editorScale * limited.scale;
 
-            // Draw all fields
             drawFields(ctx, exportScale, 0, canvas.height);
 
-            // Watermark
+            // Watermark for completed documents
             if (doc.status === 'completed') {
-                ctx.save();
-                ctx.globalAlpha = 0.06;
-                ctx.fillStyle = '#16a34a';
-                ctx.font = `bold ${60 * exportScale}px Arial`;
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate(-Math.PI / 6);
-                ctx.textAlign = 'center';
-                ctx.fillText('SIGNED', 0, 0);
-                ctx.restore();
+                const wm = document.createElement('div');
+                wm.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:64px;font-weight:bold;color:rgba(22,163,106,0.06);pointer-events:none;white-space:nowrap;letter-spacing:8px;';
+                wm.textContent = 'SIGNED';
+                pageDiv.appendChild(wm);
             }
 
-            // Create PDF fitting the image
-            const orientation = canvas.width > canvas.height ? 'l' : 'p';
-            const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height], compress: true });
-            const imgData = canvas.toDataURL('image/jpeg', 0.92);
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-            safePdfSave(pdf, doc.fileName);
+            container.appendChild(pageDiv);
+            pageElements.push(pageDiv);
+            yAccum += pgH;
         }
 
+        document.body.appendChild(container);
+
+        // Wait for all images to load
+        const allImgs = container.querySelectorAll('img');
+        await Promise.all([...allImgs].map(img =>
+            img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
+        ));
+
+        // Small delay for font rendering
+        await new Promise(r => setTimeout(r, 300));
+
+        // Check if html2pdf is available
+        if (typeof html2pdf !== 'undefined') {
+            // Use html2pdf.js for pixel-perfect rendering
+            const firstH = pageElements[0] ? pageElements[0].scrollHeight : 1131;
+            const opt = {
+                margin: 0,
+                filename: (doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf',
+                image: { type: 'jpeg', quality: 0.95 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+                jsPDF: { unit: 'px', format: [EDITOR_W, firstH], orientation: 'portrait', hotfixes: ['px_scaling'] },
+                pagebreak: { mode: ['css'] }
+            };
+            await html2pdf().set(opt).from(container).save();
+        } else {
+            // Fallback: use jsPDF with canvas capture
+            console.warn('html2pdf not available, using jsPDF canvas fallback');
+            await _downloadPdfCanvasFallback(doc);
+        }
+
+        container.remove();
         toast('ה-PDF הורד בהצלחה!');
     } catch (err) {
-        console.error('Download error:', err);
+        console.error('PDF generation error:', err);
         toast('שגיאה בהורדת הקובץ: ' + (err.message || 'נסה שוב'), 'error');
     }
 }
 
-// Fallback PNG download if jsPDF unavailable
-async function downloadAsPNG(doc, sigImages, fileImages) {
-    const img = await loadImage(doc.docImage);
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const scale = img.width / 800;
+// Fallback: jsPDF with manual canvas drawing (used if html2pdf.js not loaded)
+async function _downloadPdfCanvasFallback(doc) {
+    const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!jsPDF) { toast('ספריית PDF לא נטענה', 'error'); return; }
 
-    (doc.fields || []).forEach(f => {
-        const val = f.signedValue || f.value || '';
-        if (!val && !f.signatureData && !f.fileData) return;
-        const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
-        if (f.signatureData && sigImages[f.id]) {
-            ctx.drawImage(sigImages[f.id], fx, fy, fw, fh);
-        } else if (f.fileData && fileImages[f.id]) {
-            ctx.drawImage(fileImages[f.id], fx, fy, fw, fh);
-        } else if (val) {
-            ctx.fillStyle = '#1e293b';
-            ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw - 4);
-        }
-    });
+    const sigImages = {}, fileImages = {};
+    await Promise.all((doc.fields || []).filter(f => f.signatureData).map(async f => {
+        try { sigImages[f.id] = await loadImage(f.signatureData); } catch(e) {}
+    }));
+    await Promise.all((doc.fields || []).filter(f => f.fileData).map(async f => {
+        try { fileImages[f.id] = await loadImage(f.fileData); } catch(e) {}
+    }));
 
-    if (doc.status === 'completed') {
-        ctx.save();
-        ctx.globalAlpha = 0.06;
-        ctx.fillStyle = '#16a34a';
-        ctx.font = `bold ${60 * scale}px Arial`;
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate(-Math.PI / 6);
-        ctx.textAlign = 'center';
-        ctx.fillText('SIGNED', 0, 0);
-        ctx.restore();
+    function drawFields(ctx, scale, yOffset, pageH) {
+        (doc.fields || []).forEach(f => {
+            const val = f.signedValue || f.value || '';
+            if (!val && !f.signatureData && !f.fileData) return;
+            const fx = f.x * scale, fy = f.y * scale, fw = f.w * scale, fh = f.h * scale;
+            if (fy + fh < yOffset || fy > yOffset + pageH) return;
+            const adjY = fy - yOffset;
+            if (f.signatureData && sigImages[f.id]) {
+                ctx.drawImage(sigImages[f.id], fx, adjY, fw, fh);
+            } else if (f.fileData && fileImages[f.id]) {
+                ctx.drawImage(fileImages[f.id], fx, adjY, fw, fh);
+            } else if (val) {
+                ctx.fillStyle = '#1e293b';
+                ctx.font = `bold ${14 * scale}px Heebo, Segoe UI, Arial, sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center';
+                ctx.fillText(val, fx + fw / 2, adjY + fh / 2, fw - 4);
+            }
+        });
     }
 
-    const link = document.createElement('a');
-    link.download = `${doc.fileName || 'signed-document'}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    toast('הקובץ הורד (PNG)');
+    const mainImg = await loadImage(doc.docImage);
+    const editorScale = mainImg.width / 800;
+    const hasPages = doc.docPages && doc.docPages.length > 1 && doc.pageHeights && doc.pageHeights.length > 1;
+
+    if (hasPages) {
+        const pageImgs = [];
+        for (const pgSrc of doc.docPages) pageImgs.push(await loadImage(pgSrc));
+        const first = pageImgs[0];
+        const pdf = new jsPDF({ orientation: first.width > first.height ? 'l' : 'p', unit: 'px', format: [first.width, first.height], compress: true });
+        let yOff = 0;
+        for (let i = 0; i < pageImgs.length; i++) {
+            const pg = pageImgs[i];
+            if (i > 0) pdf.addPage([pg.width, pg.height], pg.width > pg.height ? 'l' : 'p');
+            const c = document.createElement('canvas'); c.width = pg.width; c.height = pg.height;
+            const cx = c.getContext('2d'); cx.drawImage(pg, 0, 0);
+            drawFields(cx, editorScale, yOff, pg.height);
+            pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pg.width, pg.height);
+            yOff += pg.height;
+        }
+        pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+    } else {
+        const c = document.createElement('canvas'); c.width = mainImg.width; c.height = mainImg.height;
+        const cx = c.getContext('2d'); cx.drawImage(mainImg, 0, 0);
+        drawFields(cx, editorScale, 0, c.height);
+        const pdf = new jsPDF({ orientation: c.width > c.height ? 'l' : 'p', unit: 'px', format: [c.width, c.height], compress: true });
+        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, c.width, c.height);
+        pdf.save(`${doc.fileName || 'signed-document'}.pdf`);
+    }
 }
 
 // Helper: load an image and return a promise
@@ -2524,9 +2827,30 @@ function openSignatureCanvas(docId, fieldId) {
         </div>
         <!-- Tab: Draw -->
         <div class="sign-tab-content" id="signTabDraw">
+            <!-- Drawing Controls -->
+            <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <span style="font-size:0.75em;color:var(--text-light);">עובי:</span>
+                    <input type="range" id="signThickness" min="1" max="8" value="2.5" step="0.5" onchange="updateSignThickness()" style="width:60px;">
+                    <span id="thicknessValue" style="font-size:0.75em;min-width:20px;color:var(--text-light);">2.5</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <span style="font-size:0.75em;color:var(--text-light);">צבע:</span>
+                    <input type="color" id="signColor" value="#1e293b" onchange="updateSignColor()" style="width:30px;height:22px;border:none;border-radius:4px;cursor:pointer;">
+                </div>
+            </div>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
-            <canvas id="signCanvas" class="sign-canvas" width="400" height="180"></canvas>
-            <button class="btn btn-ghost btn-sm" onclick="clearSignCanvas()" style="margin-top:6px;font-size:0.78em;">נקה ציור</button>
+            <canvas id="signCanvas" class="sign-canvas" width="800" height="360" style="width:100%;max-width:460px;height:180px;border:2px solid var(--border);border-radius:8px;background:white;touch-action:none;"></canvas>
+            <div style="display:flex;gap:6px;margin-top:6px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" onclick="undoSignCanvas()" id="undoBtn" style="font-size:0.78em;" disabled>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+                    בטל
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="clearSignCanvas()" style="font-size:0.78em;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                    נקה
+                </button>
+            </div>
         </div>
         <!-- Tab: Type name -->
         <div class="sign-tab-content" id="signTabType" style="display:none;">
@@ -2564,23 +2888,142 @@ function openSignatureCanvas(docId, fieldId) {
     </div>`;
     document.body.appendChild(overlay);
 
-    // Setup draw canvas
+    // Setup draw canvas with enhanced drawing
     const canvas = document.getElementById('signCanvas');
     const ctx = canvas.getContext('2d');
+
+    // High-DPI setup for crisp signatures
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    // Store original dimensions before scaling
+    window._signCanvasScale = dpr;
+
+    // Enhanced anti-aliasing
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Enhanced drawing state
     let drawing = false;
-    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    let lastPos = null;
+    let strokeHistory = [];
+    let currentStroke = [];
+
+    // Drawing settings - initialize globals
+    window._signColor = '#1e293b';
+    window._signBaseWidth = 2.5;
+
+    ctx.strokeStyle = window._signColor;
+    ctx.lineWidth = window._signBaseWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Smoothing parameters
+    const SMOOTHING = 0.4;
+    const MIN_DISTANCE = 1.5;
 
     function pos(e) {
         const r = canvas.getBoundingClientRect();
         const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
         const cy = (e.clientY || e.touches?.[0]?.clientY || 0) - r.top;
-        return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
+        // Get pressure for touch events (if available)
+        const pressure = e.touches?.[0]?.force || e.pressure || 0.5;
+        return {
+            x: cx * (canvas.width / r.width),
+            y: cy * (canvas.height / r.height),
+            pressure: Math.min(Math.max(pressure, 0.1), 1.0)
+        };
     }
-    canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-    canvas.onmousemove = canvas.ontouchmove = e => { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
-    canvas.onmouseup = canvas.ontouchend = () => { drawing = false; };
-    canvas.onmouseleave = () => { drawing = false; };
+
+    function distance(p1, p2) {
+        return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    }
+
+    function drawSmoothLine(p1, p2, pressure) {
+        if (!p1 || !p2) return;
+
+        // Vary line width based on pressure
+        const baseWidth = 2.5;
+        const pressureWidth = baseWidth * (0.5 + pressure * 0.8);
+        ctx.lineWidth = pressureWidth;
+
+        // Smooth curve between points
+        const xc = (p1.x + p2.x) / 2;
+        const yc = (p1.y + p2.y) / 2;
+
+        ctx.beginPath();
+        ctx.moveTo(lastPos?.x || p1.x, lastPos?.y || p1.y);
+        ctx.quadraticCurveTo(p1.x, p1.y, xc, yc);
+        ctx.stroke();
+
+        lastPos = p2;
+    }
+
+    function startDrawing(e) {
+        e.preventDefault();
+        drawing = true;
+        const p = pos(e);
+        lastPos = p;
+        currentStroke = [p];
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    }
+
+    function continueDrawing(e) {
+        if (!drawing) return;
+        e.preventDefault();
+
+        const p = pos(e);
+
+        // Only draw if we've moved enough distance for smoother lines
+        if (lastPos && distance(lastPos, p) < MIN_DISTANCE) return;
+
+        currentStroke.push(p);
+        drawSmoothLine(lastPos, p, p.pressure);
+    }
+
+    function stopDrawing() {
+        if (!drawing) return;
+        drawing = false;
+
+        // Save stroke to history for undo functionality
+        if (currentStroke.length > 0) {
+            strokeHistory.push([...currentStroke]);
+        }
+
+        currentStroke = [];
+        lastPos = null;
+        updateUndoButton();
+    }
+
+    // Event listeners
+    canvas.onmousedown = startDrawing;
+    canvas.onmousemove = continueDrawing;
+    canvas.onmouseup = stopDrawing;
+    canvas.onmouseleave = stopDrawing;
+
+    // Enhanced touch events for mobile
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startDrawing(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        continueDrawing(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        stopDrawing(e);
+    }, { passive: false });
+
+    // Prevent scrolling on mobile while drawing
+    canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
     window._signCanvas = canvas;
+    window._signStrokeHistory = strokeHistory;
 
     // Setup upload drag & drop
     const uploadArea = document.getElementById('signUploadArea');
@@ -2642,7 +3085,91 @@ function clearSignUpload() {
     if (area) area.style.display = '';
 }
 
-function clearSignCanvas() { const c = window._signCanvas; if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); }
+// Enhanced signature functions
+function updateSignThickness() {
+    const slider = document.getElementById('signThickness');
+    const value = document.getElementById('thicknessValue');
+    if (slider && value) {
+        value.textContent = slider.value;
+        window._signBaseWidth = parseFloat(slider.value);
+    }
+}
+
+function updateSignColor() {
+    const colorPicker = document.getElementById('signColor');
+    if (colorPicker) {
+        window._signColor = colorPicker.value;
+        const canvas = window._signCanvas;
+        if (canvas) {
+            canvas.getContext('2d').strokeStyle = colorPicker.value;
+        }
+    }
+}
+
+function updateUndoButton() {
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn && window._signStrokeHistory) {
+        undoBtn.disabled = window._signStrokeHistory.length === 0;
+    }
+}
+
+function redrawCanvas() {
+    const canvas = window._signCanvas;
+    const strokeHistory = window._signStrokeHistory;
+    if (!canvas || !strokeHistory) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    strokeHistory.forEach(stroke => {
+        if (stroke.length < 2) return;
+
+        ctx.strokeStyle = window._signColor || '#1e293b';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        let lastPos = null;
+        stroke.forEach((point, index) => {
+            if (index === 0) {
+                ctx.beginPath();
+                ctx.moveTo(point.x, point.y);
+                lastPos = point;
+                return;
+            }
+
+            const baseWidth = window._signBaseWidth || 2.5;
+            const pressureWidth = baseWidth * (0.5 + point.pressure * 0.8);
+            ctx.lineWidth = pressureWidth;
+
+            if (lastPos) {
+                const xc = (lastPos.x + point.x) / 2;
+                const yc = (lastPos.y + point.y) / 2;
+                ctx.quadraticCurveTo(lastPos.x, lastPos.y, xc, yc);
+                ctx.stroke();
+            }
+            lastPos = point;
+        });
+    });
+}
+
+function undoSignCanvas() {
+    if (window._signStrokeHistory && window._signStrokeHistory.length > 0) {
+        window._signStrokeHistory.pop();
+        redrawCanvas();
+        updateUndoButton();
+    }
+}
+
+function clearSignCanvas() {
+    const c = window._signCanvas;
+    if (c) {
+        c.getContext('2d').clearRect(0, 0, c.width, c.height);
+        if (window._signStrokeHistory) {
+            window._signStrokeHistory.length = 0;
+            updateUndoButton();
+        }
+    }
+}
 function cancelSignCanvas() { const m = document.getElementById('signModal'); if (m) m.remove(); delete window._signCanvas; window._signUploadData = null; }
 function confirmSignCanvas(docId, fieldId) {
     const doc = DM.docs.find(d => d.id === docId);
@@ -2658,7 +3185,9 @@ function confirmSignCanvas(docId, fieldId) {
         let hasContent = false;
         for (let i = 3; i < pixels.length; i += 4) { if (pixels[i] > 0) { hasContent = true; break; } }
         if (!hasContent) { toast('יש לצייר חתימה', 'error'); return; }
-        signatureData = c.toDataURL();
+
+        // Export with higher quality and compression
+        signatureData = c.toDataURL('image/png', 0.9);
     } else if (tab === 'type') {
         const input = document.getElementById('signNameInput');
         const name = input ? input.value.trim() : '';
@@ -2868,17 +3397,24 @@ function completeSign(docId) {
         toast('תוקף המסמך פג', 'error'); return;
     }
     const isSignerView = !!DM._currentSigner;
-    const signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
+    let signerRecipient = isSignerView ? (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim()) : null;
+
+    // If signer name doesn't match any recipient, match to first unsigned (or first if only one)
+    if (isSignerView && !signerRecipient) {
+        const recipients = doc.recipients || [];
+        signerRecipient = recipients.find(r => !r.signed) || recipients[0];
+        if (signerRecipient) signerRecipient.name = DM._currentSigner;
+    }
 
     if (isSignerView && signerRecipient) {
-        // Signer view: only check THIS signer's required fields
-        const myUnfilled = (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && f.required && !f.fixed && !f.signedValue && !f.value);
+        // Signer view: check assigned fields, or all non-fixed if none assigned
+        const assignedFields = (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed);
+        const myFields = assignedFields.length > 0 ? assignedFields : (doc.fields || []).filter(f => !f.fixed);
+        const myUnfilled = myFields.filter(f => f.required && !f.signedValue && !f.value);
         if (myUnfilled.length > 0) { toast(`נותרו ${myUnfilled.length} שדות חובה`, 'error'); return; }
-        // Mark only this recipient as signed
         signerRecipient.signed = true;
         signerRecipient.signedAt = new Date().toISOString();
         addAudit(doc, 'signed', `${DM._currentSigner} חתם/ה על המסמך`);
-        // Check if ALL recipients have signed
         const allSigned = (doc.recipients || []).every(r => r.signed);
         if (allSigned) {
             doc.status = 'completed';
@@ -2904,7 +3440,9 @@ function completeSign(docId) {
         const signedF = (doc.fields || []).filter(f => f.signedValue).length;
         const allDone = doc.status === 'completed';
         const sName = isSignerView ? DM._currentSigner : 'בעל המסמך';
-        emailNotifyOwner(doc, sName, { filled: signedF, total: totalF, allDone });
+        emailNotifyOwner(doc, sName, { filled: signedF, total: totalF, allDone }).then(ok => {
+            if (!ok) console.warn('Email notification failed');
+        });
     }
     if (isSignerView && DM._currentSignerEmail && typeof emailNotifySigner === 'function') {
         emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
@@ -2918,6 +3456,97 @@ function completeSign(docId) {
         DM._currentSignerEmail = null;
         switchView('home');
     }
+}
+
+// ==================== SHARE DOCUMENT ====================
+function openShareModal(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) {
+        toast('המסמך לא נמצא', 'error');
+        return;
+    }
+
+    const shareUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'shareModal';
+    overlay.innerHTML = `
+        <div class="modal-card" style="max-width:480px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+                <h3 style="font-weight:700;margin:0;">שיתוף מסמך</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeShareModal()" style="font-size:1.1em;">✕</button>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <div style="color:var(--text-light);font-size:0.9em;margin-bottom:8px;">שם המסמך:</div>
+                <div style="font-weight:600;margin-bottom:15px;">${doc.fileName || 'מסמך ללא שם'}</div>
+
+                <div style="color:var(--text-light);font-size:0.9em;margin-bottom:8px;">קישור ציבורי לצפייה וחתימה:</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="shareUrlInput" class="form-input" value="${shareUrl}"
+                           readonly style="font-size:0.8em;padding:8px;direction:ltr;flex:1;"
+                           onclick="this.select()">
+                    <button class="btn btn-primary btn-sm" onclick="copyShareUrl()" title="העתק">
+                        ${ICO.copy}
+                    </button>
+                </div>
+
+                <div style="background:var(--bg-light);padding:12px;border-radius:8px;margin-top:15px;font-size:0.85em;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        ${ICO.link}
+                        <span style="font-weight:600;">כיצד זה עובד?</span>
+                    </div>
+                    <div style="color:var(--text-light);line-height:1.4;">
+                        • הקישור מאפשר לכל מי שיש לו גישה לצפות במסמך ולחתום עליו<br>
+                        • לא נדרשת הרשמה או התחברות<br>
+                        • ניתן לשלוח את הקישור באימייל, WhatsApp או כל אפליקציה אחרת
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn btn-ghost" onclick="closeShareModal()">סגור</button>
+                <button class="btn btn-success" onclick="copyAndClose()">העתק וסגור</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Focus on URL input for easy copying
+    setTimeout(() => {
+        const input = document.getElementById('shareUrlInput');
+        if (input) input.select();
+    }, 100);
+}
+
+function closeShareModal() {
+    const modal = document.getElementById('shareModal');
+    if (modal) modal.remove();
+}
+
+function copyShareUrl() {
+    const input = document.getElementById('shareUrlInput');
+    if (input) {
+        input.select();
+        navigator.clipboard.writeText(input.value).then(() => {
+            toast('הקישור הועתק!', 'success');
+        }).catch(() => {
+            // Fallback for older browsers
+            try {
+                document.execCommand('copy');
+                toast('הקישור הועתק!', 'success');
+            } catch (err) {
+                toast('שגיאה בהעתקת הקישור', 'error');
+            }
+        });
+    }
+}
+
+function copyAndClose() {
+    copyShareUrl();
+    setTimeout(() => closeShareModal(), 300);
 }
 
 // ==================== MOBILE MENU ====================
@@ -2961,6 +3590,14 @@ document.head.appendChild(style);
 // Check URL hash for direct document signing link (e.g. #sign/dm_123456)
 function checkUrlHash() {
     const hash = location.hash;
+
+    // Check for shared document links (e.g. #share/sh_123456)
+    if (hash.startsWith('#share/')) {
+        const linkId = hash.substring(7);
+        openSharedDocument(linkId);
+        return true;
+    }
+
     if (hash.startsWith('#sign/')) {
         const docId = hash.substring(6);
         const doc = DM.docs.find(d => d.id === docId);
@@ -2988,6 +3625,321 @@ function checkUrlHash() {
         }
     }
     return false;
+}
+
+// ==================== SHARED DOCUMENT VIEWING ====================
+function openSharedDocument(linkId) {
+    // First check localStorage for existing shared doc
+    const cachedDoc = localStorage.getItem(`shared_doc_${linkId}`);
+    if (cachedDoc) {
+        try {
+            const sharedDoc = JSON.parse(cachedDoc);
+            if (isValidSharedDocument(sharedDoc)) {
+                renderSharedDocument(sharedDoc);
+                return;
+            }
+        } catch (e) {
+            localStorage.removeItem(`shared_doc_${linkId}`);
+        }
+    }
+
+    // Load from Firebase
+    if (window.db) {
+        window.db.collection('shared_documents').doc(linkId).get()
+            .then(doc => {
+                if (doc.exists) {
+                    const sharedDoc = doc.data();
+                    if (isValidSharedDocument(sharedDoc)) {
+                        // Cache it locally for faster future access
+                        localStorage.setItem(`shared_doc_${linkId}`, JSON.stringify(sharedDoc));
+                        renderSharedDocument(sharedDoc);
+                        return;
+                    }
+                }
+                // Document not found or invalid
+                renderSharedDocumentError('המסמך לא נמצא או שפג תוקפו');
+            })
+            .catch(error => {
+                console.error('Error loading shared document:', error);
+                renderSharedDocumentError('שגיאה בטעינת המסמך');
+            });
+    } else {
+        renderSharedDocumentError('שירות השיתוף אינו זמין');
+    }
+}
+
+function isValidSharedDocument(sharedDoc) {
+    if (!sharedDoc || !sharedDoc.settings) return false;
+
+    const settings = sharedDoc.settings;
+
+    // Check if still active
+    if (!settings.isActive) return false;
+
+    // Check expiry
+    if (settings.expiresAt && new Date(settings.expiresAt) < new Date()) return false;
+
+    // Check view limit
+    if (settings.maxViews && settings.viewCount >= settings.maxViews) return false;
+
+    return true;
+}
+
+function renderSharedDocument(sharedDoc) {
+    const needsPassword = sharedDoc.settings.password && !sessionStorage.getItem(`share_auth_${sharedDoc.linkId}`);
+
+    if (needsPassword) {
+        renderPasswordPrompt(sharedDoc);
+        return;
+    }
+
+    // Increment view count
+    incrementViewCount(sharedDoc.linkId);
+
+    // Switch to public view mode
+    DM.view = 'shared';
+    DM.sharedDoc = sharedDoc;
+
+    // Hide topbar and sidebar for public view
+    document.body.classList.add('public-view');
+
+    render();
+}
+
+function renderPasswordPrompt(sharedDoc) {
+    const main = document.getElementById('mainContent');
+    const topbar = document.getElementById('appTopbar');
+    const sidebar = document.getElementById('appSidebar');
+
+    // Hide main UI elements
+    if (topbar) topbar.style.display = 'none';
+    if (sidebar) sidebar.style.display = 'none';
+
+    main.innerHTML = `
+        <div class="public-password-screen">
+            <div class="public-password-card">
+                <div class="logo" style="margin-bottom: 24px;">
+                    <svg width="40" height="40" viewBox="0 0 100 100">
+                        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#4f46e5"/></linearGradient></defs>
+                        <rect width="100" height="100" rx="20" fill="url(#lg)"/>
+                        <path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="3.5"/>
+                        <polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/>
+                        <path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/>
+                    </svg>
+                    <h1>SmoovSign</h1>
+                </div>
+
+                <h2>מסמך מוגן בסיסמה</h2>
+                <p>המסמך "${sharedDoc.docData.fileName}" מוגן בסיסמה</p>
+
+                <div class="form-group">
+                    <input type="password" class="form-input" id="sharePassword" placeholder="הזן סיסמה..." style="text-align: center;" onkeypress="if(event.key==='Enter') verifySharePassword('${sharedDoc.linkId}')">
+                </div>
+
+                <button class="btn btn-primary btn-lg" onclick="verifySharePassword('${sharedDoc.linkId}')" style="width: 100%;">
+                    צפייה במסמך
+                </button>
+
+                <div id="passwordError" class="error-message" style="display: none; margin-top: 12px; color: var(--danger);"></div>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => document.getElementById('sharePassword').focus(), 100);
+}
+
+function verifySharePassword(linkId) {
+    const password = document.getElementById('sharePassword').value;
+    const errorDiv = document.getElementById('passwordError');
+
+    if (!password) {
+        errorDiv.textContent = 'יש להזין סיסמה';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const sharedDocData = localStorage.getItem(`shared_doc_${linkId}`);
+    if (sharedDocData) {
+        const sharedDoc = JSON.parse(sharedDocData);
+        if (sharedDoc.settings.password === password) {
+            sessionStorage.setItem(`share_auth_${linkId}`, 'true');
+            renderSharedDocument(sharedDoc);
+        } else {
+            errorDiv.textContent = 'סיסמה שגויה';
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+function incrementViewCount(linkId) {
+    if (!window.db) return;
+
+    window.db.collection('shared_documents').doc(linkId).update({
+        'settings.viewCount': firebase.firestore.FieldValue.increment(1)
+    }).catch(error => {
+        console.error('Error updating view count:', error);
+    });
+}
+
+function renderSharedDocumentError(message) {
+    const main = document.getElementById('mainContent');
+    const topbar = document.getElementById('appTopbar');
+    const sidebar = document.getElementById('appSidebar');
+
+    // Hide main UI elements
+    if (topbar) topbar.style.display = 'none';
+    if (sidebar) sidebar.style.display = 'none';
+
+    main.innerHTML = `
+        <div class="public-error-screen">
+            <div class="public-error-card">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <h2>${message}</h2>
+                <p>הקישור עשוי להיות שגוי, פג תוקף, או שהגיע למגבלת הצפיות.</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderSharedDocumentView(el) {
+    if (!DM.sharedDoc) {
+        renderSharedDocumentError('שגיאה בטעינת המסמך');
+        return;
+    }
+
+    const doc = DM.sharedDoc.docData;
+    const settings = DM.sharedDoc.settings;
+    const docImage = doc.docImage || (doc.docPages && doc.docPages[0]);
+
+    if (!docImage) {
+        renderSharedDocumentError('המסמך לא נמצא');
+        return;
+    }
+
+    el.innerHTML = `
+        <div class="shared-document-viewer">
+            <div class="shared-header">
+                <div class="shared-logo">
+                    <svg width="24" height="24" viewBox="0 0 100 100">
+                        <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#4f46e5"/></linearGradient></defs>
+                        <rect width="100" height="100" rx="20" fill="url(#lg2)"/>
+                        <path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="3.5"/>
+                        <polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/>
+                        <path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/>
+                    </svg>
+                    <span>SmoovSign</span>
+                </div>
+
+                <div class="shared-doc-info">
+                    <h1>${doc.fileName || 'מסמך משותף'}</h1>
+                    <div class="shared-meta">
+                        ${settings.viewCount ? `נצפה ${settings.viewCount} פעמים` : ''}
+                        ${settings.maxViews ? `• מתוך ${settings.maxViews} מקסימום` : ''}
+                        ${settings.expiresAt ? `• פג תוקף ב-${new Date(settings.expiresAt).toLocaleDateString('he-IL')}` : ''}
+                    </div>
+                </div>
+
+                <div class="shared-actions">
+                    <button class="btn btn-outline" onclick="downloadSharedPDF()">
+                        ${ICO.download} הורדה
+                    </button>
+                </div>
+            </div>
+
+            <div class="shared-document-container">
+                ${doc.docPages && doc.docPages.length > 1 ? renderSharedMultiPageDocument(doc) : renderSharedSinglePageDocument(doc)}
+            </div>
+
+            ${doc.fields && doc.fields.length > 0 ? `
+                <div class="shared-fields-panel">
+                    <h3>שדות במסמך</h3>
+                    <div class="shared-fields-list">
+                        ${doc.fields.map(field => `
+                            <div class="shared-field-item">
+                                <strong>${field.label || field.type}:</strong>
+                                <span>${field.value || '(ריק)'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function renderSharedSinglePageDocument(doc) {
+    const image = doc.docImage || doc.docPages[0];
+    return `
+        <div class="shared-page">
+            <div class="shared-page-image">
+                <img src="${image}" alt="מסמך" style="max-width: 100%; height: auto;" />
+                ${renderSharedFields(doc.fields || [])}
+            </div>
+        </div>
+    `;
+}
+
+function renderSharedMultiPageDocument(doc) {
+    return `
+        <div class="shared-multi-page">
+            ${doc.docPages.map((page, index) => `
+                <div class="shared-page">
+                    <div class="shared-page-header">
+                        <h4>עמוד ${index + 1}</h4>
+                    </div>
+                    <div class="shared-page-image">
+                        <img src="${page}" alt="עמוד ${index + 1}" style="max-width: 100%; height: auto;" />
+                        ${renderSharedFields(doc.fields ? doc.fields.filter(f => f.page === index) : [])}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderSharedFields(fields) {
+    return fields.map(field => {
+        const style = `
+            position: absolute;
+            left: ${field.x}px;
+            top: ${field.y}px;
+            width: ${field.width}px;
+            height: ${field.height}px;
+            border: 2px solid #2563eb;
+            background: rgba(37, 99, 235, 0.1);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #2563eb;
+            font-weight: 600;
+            pointer-events: none;
+        `;
+
+        return `<div style="${style}" title="${field.label || field.type}: ${field.value || '(ריק)'}">${field.value || field.type}</div>`;
+    }).join('');
+}
+
+function downloadSharedPDF() {
+    if (!DM.sharedDoc) return;
+
+    const doc = DM.sharedDoc.docData;
+    const filename = (doc.fileName || 'shared-document') + '.pdf';
+
+    // Use existing PDF generation logic
+    if (doc.docPages && doc.docPages.length > 1) {
+        generateMultiPagePDF(doc.docPages, doc.fields || [], filename);
+    } else {
+        const image = doc.docImage || doc.docPages[0];
+        generateSinglePagePDF(image, doc.fields || [], filename);
+    }
+
+    toast('מוריד PDF...', 'success');
 }
 
 // ==================== AUTH STATE ====================
