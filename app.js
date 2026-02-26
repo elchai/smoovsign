@@ -495,85 +495,7 @@ function deleteContact(id) {
 }
 
 // ==================== SHARE FUNCTIONALITY ====================
-function openShareModal(docId) {
-    const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) return;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.id = 'shareModal';
-    overlay.innerHTML = `<div class="modal-card" style="max-width:500px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-            <h3 style="font-weight:700;margin:0;">שיתוף מסמך</h3>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('shareModal').remove()" style="font-size:1.1em;">✕</button>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">שם המסמך</label>
-            <div style="padding:8px 12px;background:var(--bg-light);border-radius:8px;font-size:0.9em;">${doc.fileName || 'מסמך ללא שם'}</div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">קישור ציבורי</label>
-            <div style="display:flex;gap:8px;">
-                <input type="text" class="form-input" id="publicLink" readonly placeholder="יש ליצור קישור..." dir="ltr" style="flex:1;">
-                <button class="btn btn-outline" onclick="copyToClipboard(document.getElementById('publicLink').value)" id="copyBtn" disabled>העתק</button>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">הגדרות שיתוף</label>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
-                    <input type="checkbox" id="requirePassword">
-                    הגנה בסיסמה
-                </label>
-                <input type="password" class="form-input" id="sharePassword" placeholder="סיסמה (אופציונלי)" style="display:none;">
-
-                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
-                    <input type="checkbox" id="setExpiry">
-                    הגדרת תוקף
-                </label>
-                <input type="datetime-local" class="form-input" id="expiryDate" style="display:none;">
-
-                <label style="display:flex;align-items:center;gap:8px;font-size:0.9em;">
-                    <input type="checkbox" id="limitViews">
-                    הגבלת צפיות
-                </label>
-                <input type="number" class="form-input" id="maxViews" placeholder="מספר צפיות מקסימלי" min="1" max="100" style="display:none;">
-            </div>
-        </div>
-
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
-            <button class="btn btn-outline" onclick="document.getElementById('shareModal').remove()">ביטול</button>
-            <button class="btn btn-primary" onclick="generateShareLink('${docId}')">יצירת קישור</button>
-        </div>
-    </div>`;
-
-    document.body.appendChild(overlay);
-
-    // Add event listeners for checkboxes
-    document.getElementById('requirePassword').addEventListener('change', function() {
-        document.getElementById('sharePassword').style.display = this.checked ? 'block' : 'none';
-    });
-
-    document.getElementById('setExpiry').addEventListener('change', function() {
-        document.getElementById('expiryDate').style.display = this.checked ? 'block' : 'none';
-    });
-
-    document.getElementById('limitViews').addEventListener('change', function() {
-        document.getElementById('maxViews').style.display = this.checked ? 'block' : 'none';
-    });
-
-    // Check if link already exists
-    if (doc.publicShare && doc.publicShare.linkId) {
-        const baseUrl = window.location.origin + window.location.pathname;
-        const publicUrl = `${baseUrl}#share/${doc.publicShare.linkId}`;
-        document.getElementById('publicLink').value = publicUrl;
-        document.getElementById('copyBtn').disabled = false;
-        document.querySelector('.btn.btn-primary').textContent = 'עדכון קישור';
-    }
-}
+// openShareModal is defined later (near shared document section)
 
 function generateShareLink(docId) {
     const doc = DM.docs.find(d => d.id === docId);
@@ -1876,27 +1798,36 @@ function renderSend(el) {
 }
 
 function createLinkOnly() {
-    if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
-    const now = new Date().toISOString();
-    const doc = {
-        id: 'dm_' + Date.now(),
-        fileName: DM.fileName || 'מסמך ללא שם',
-        docImage: DM.docImage,
-        pageHeights: DM.pageHeights || [],
-        pageWidth: DM.pageWidth || 0,
-        recipients: JSON.parse(JSON.stringify(DM.recipients)),
-        fields: JSON.parse(JSON.stringify(DM.fields)),
-        status: 'sent',
-        createdAt: now,
-        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
-        audit: [{ action: 'created', time: now, detail: 'המסמך נוצר (קישור ללא שליחה)' }]
-    };
-    DM.docs.push(doc);
-    save();
-    if (typeof firebaseSaveDoc === 'function') {
-        firebaseSaveDoc(doc).then(ok => { if (ok) console.log('Document saved to Firebase'); });
+    try {
+        if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+        if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
+        const now = new Date().toISOString();
+        const doc = {
+            id: 'dm_' + Date.now(),
+            fileName: DM.fileName || 'מסמך ללא שם',
+            docImage: DM.docImage,
+            docPages: DM.docPages || [],
+            pageHeights: DM.pageHeights || [],
+            pageWidth: DM.pageWidth || 0,
+            recipients: JSON.parse(JSON.stringify(DM.recipients)),
+            fields: JSON.parse(JSON.stringify(DM.fields)),
+            status: 'sent',
+            createdAt: now,
+            createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
+            ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
+            audit: [{ action: 'created', time: now, detail: 'המסמך נוצר (קישור ללא שליחה)' }]
+        };
+        DM.docs.push(doc);
+        save();
+        if (typeof firebaseSaveDoc === 'function') {
+            firebaseSaveDoc(doc).then(ok => { if (ok) console.log('Document saved to Firebase'); });
+        }
+        resetEditor();
+        showLinkSuccess(doc);
+    } catch (err) {
+        console.error('createLinkOnly error:', err);
+        toast('שגיאה ביצירת קישור: ' + err.message, 'error');
     }
-    showLinkSuccess(doc);
 }
 
 function showLinkSuccess(doc) {
@@ -1989,8 +1920,9 @@ function sendDocument() {
     const expiryInput = document.getElementById('docExpiry');
     const doc = {
         id: 'dm_' + Date.now(),
-        fileName: DM.fileName,
+        fileName: DM.fileName || 'מסמך ללא שם',
         docImage: DM.docImage,
+        docPages: DM.docPages || [],
         pageHeights: DM.pageHeights || [],
         pageWidth: DM.pageWidth || 0,
         recipients: JSON.parse(JSON.stringify(DM.recipients)),
@@ -1998,6 +1930,7 @@ function sendDocument() {
         status: 'sent',
         createdAt: now,
         createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
+        ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
         expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
         audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
     };
@@ -2027,8 +1960,7 @@ function sendDocument() {
 
     toast('המסמך נשלח בהצלחה!');
     resetEditor();
-    DM.view = 'home';
-    render();
+    showLinkSuccess(doc);
 }
 
 // ==================== SAVE TEMPLATE ====================
