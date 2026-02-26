@@ -4222,13 +4222,13 @@ function onAuthStateChanged(user) {
 
 // Init: hide app until auth resolves
 document.querySelector('.topbar').style.display = 'none';
-document.getElementById('mainContent').style.display = 'none';
+document.getElementById('appLayout').style.display = 'none';
 
 // For sign/share links: show content immediately without waiting for auth
 const _initHash = window.location.hash;
-if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/')) {
+if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/') || _initHash.startsWith('#fill/')) {
     document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainContent').style.display = '';
+    document.getElementById('appLayout').style.display = '';
     document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';
 }
 
