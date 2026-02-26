@@ -361,6 +361,7 @@ function renderDocRows(docs, mode) {
                 <button class="btn btn-ghost btn-sm" onclick="openSign('${doc.id}')" title="צפייה">${ICO.eye}</button>
                 <button class="btn btn-ghost btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורדה">${ICO.download}</button>
                 <button class="btn btn-ghost btn-sm" onclick="openShareModal('${doc.id}')" title="שיתוף">${ICO.share}</button>
+                ${mode !== 'deleted' ? `<button class="btn btn-ghost btn-sm" onclick="deleteDoc('${doc.id}')" title="מחיקה" style="color:var(--danger);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>` : ''}
                 ${mode === 'waiting' ? `<button class="btn btn-primary btn-sm" onclick="openSign('${doc.id}')">מילוי טופס</button>` : ''}
                 ${mode === 'deleted' ? `<button class="btn btn-outline btn-sm" onclick="restoreDoc('${doc.id}')">שחזור</button>` : ''}
             </div>
