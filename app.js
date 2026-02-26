@@ -2064,35 +2064,46 @@ async function saveTemplate() {
     if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
 
-    const tpl = {
-        id: DM.editingTemplateId || 'tpl_' + Date.now(),
-        name: DM.fileName || 'תבנית ללא שם',
-        docImage: DM.docImage,
-        docPages: DM.docPages || [],
-        pageHeights: DM.pageHeights || [],
-        pageWidth: DM.pageWidth || 0,
-        fields: JSON.parse(JSON.stringify(DM.fields)),
-        fixedFields: DM.fields.filter(f => f.fixed),
-        createdAt: new Date().toISOString(),
-        createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
-        ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
-    };
+    // Show saving indicator
+    const saveBtn = document.querySelector('.wizard-footer .btn-success');
+    const origText = saveBtn ? saveBtn.textContent : '';
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'שומר...'; }
 
-    if (DM.editingTemplateId) {
-        const idx = DM.templates.findIndex(t => t.id === DM.editingTemplateId);
-        if (idx >= 0) DM.templates[idx] = tpl;
-    } else {
-        DM.templates.push(tpl);
+    try {
+        const tpl = {
+            id: DM.editingTemplateId || 'tpl_' + Date.now(),
+            name: DM.fileName || 'תבנית ללא שם',
+            docImage: DM.docImage,
+            docPages: DM.docPages || [],
+            pageHeights: DM.pageHeights || [],
+            pageWidth: DM.pageWidth || 0,
+            fields: JSON.parse(JSON.stringify(DM.fields)),
+            fixedFields: DM.fields.filter(f => f.fixed),
+            createdAt: new Date().toISOString(),
+            createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
+            ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
+        };
+
+        if (DM.editingTemplateId) {
+            const idx = DM.templates.findIndex(t => t.id === DM.editingTemplateId);
+            if (idx >= 0) DM.templates[idx] = tpl;
+        } else {
+            DM.templates.push(tpl);
+        }
+        save();
+
+        // Save to Firebase so external users can load via #fill/ link
+        if (typeof firebaseSaveTemplate === 'function') {
+            const saved = await firebaseSaveTemplate(tpl);
+            if (!saved) toast('התבנית נשמרה מקומית, אך לא הועלתה לענן', 'error');
+        }
+
+        showTemplateLinkSuccess(tpl);
+    } catch (err) {
+        console.error('saveTemplate error:', err);
+        toast('שגיאה בשמירת התבנית: ' + err.message, 'error');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = origText; }
     }
-    save();
-
-    // Save to Firebase so external users can load via #fill/ link
-    if (typeof firebaseSaveTemplate === 'function') {
-        const saved = await firebaseSaveTemplate(tpl);
-        if (!saved) toast('שגיאה בשמירת התבנית לענן', 'error');
-    }
-
-    showTemplateLinkSuccess(tpl);
 }
 
 function showTemplateLinkSuccess(tpl) {

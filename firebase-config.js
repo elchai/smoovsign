@@ -114,7 +114,7 @@ async function storageUploadImages(id, docImage, docPages) {
         }
         return true;
     } catch (err) {
-        console.warn('Storage upload error:', err);
+        console.error('Storage upload error:', err.code, err.message);
         return false;
     }
 }
