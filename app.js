@@ -4153,7 +4153,7 @@ function downloadSharedPDF() {
 function onAuthStateChanged(user) {
     const loginScreen = document.getElementById('loginScreen');
     const topbar = document.querySelector('.topbar');
-    const mainContent = document.getElementById('mainContent');
+    const appLayout = document.getElementById('appLayout');
     const userMenu = document.getElementById('userMenu');
 
     // Signing links should work without auth
@@ -4164,7 +4164,7 @@ function onAuthStateChanged(user) {
         // User is logged in
         smoovCurrentUser = user;
         loginScreen.style.display = 'none';
-        mainContent.style.display = '';
+        appLayout.style.display = '';
 
         const isFillLink = hash.startsWith('#fill/');
         if (isFillLink) {
@@ -4195,14 +4195,14 @@ function onAuthStateChanged(user) {
         // Allow signing without login
         loginScreen.style.display = 'none';
         topbar.style.display = 'none';
-        mainContent.style.display = '';
+        appLayout.style.display = '';
         userMenu.style.display = 'none';
         checkUrlHash();
     } else {
         // Not logged in - show login screen
         loginScreen.style.display = 'flex';
         topbar.style.display = 'none';
-        mainContent.style.display = 'none';
+        appLayout.style.display = 'none';
         userMenu.style.display = 'none';
 
         // Show fill-link hint if opening a template fill link
