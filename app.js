@@ -1900,9 +1900,9 @@ function showLinkSuccess(doc) {
         </div>
         <h2 style="font-size:1.5em;font-weight:800;margin:16px 0 6px;">המסמך מוכן לחתימה!</h2>
         <p style="color:var(--text-light);font-size:0.9em;margin-bottom:24px;">עדכון ישלח אליך כאשר המסמך יחתם</p>
-        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">נתיב מסמך:</div>
+        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">${(doc.recipients || []).length > 0 ? 'נתיב מסמך:' : 'קישור לחתימה:'}</div>
         <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px;">
-            ${doc.recipients.map((r, i) => {
+            ${(doc.recipients || []).length > 0 ? doc.recipients.map((r, i) => {
                 const signUrl = baseUrl;
                 return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg);border-radius:10px;">
                     <div style="display:flex;align-items:center;gap:10px;">
@@ -1914,7 +1914,12 @@ function showLinkSuccess(doc) {
                         העתק קישור
                     </button>
                 </div>`;
-            }).join('')}
+            }).join('') : `<div style="display:flex;align-items:center;justify-content:center;padding:12px 16px;background:var(--bg);border-radius:10px;">
+                <button class="btn btn-primary" onclick="copySignLink(this,'${baseUrl}')" style="display:flex;align-items:center;gap:8px;padding:10px 24px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                    העתק קישור לשיתוף
+                </button>
+            </div>`}
         </div>
         <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
             <h3 style="font-weight:700;margin-bottom:6px;">צור תבנית</h3>
