@@ -213,12 +213,15 @@ async function firebaseUpdateDoc(doc) {
 async function firebaseSaveTemplate(tpl) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        // Save images to Storage, metadata to Firestore
-        if (tpl.docImage || (tpl.docPages && tpl.docPages.length)) {
-            await storageUploadImages(tpl.id, tpl.docImage, tpl.docPages);
-        }
+        // Save metadata to Firestore first (fast)
         await smoovDb.collection('smoov_docs').doc(tpl.id).set(_stripImages(tpl));
-        console.log('Template saved to Firebase:', tpl.id);
+        console.log('Template metadata saved to Firebase:', tpl.id);
+        // Upload images to Storage in background (slow, don't block)
+        if (tpl.docImage || (tpl.docPages && tpl.docPages.length)) {
+            storageUploadImages(tpl.id, tpl.docImage, tpl.docPages)
+                .then(ok => { if (ok) console.log('Template images uploaded:', tpl.id); })
+                .catch(e => console.warn('Template image upload error:', e));
+        }
         return true;
     } catch (err) {
         console.warn('Firestore save template error:', err);

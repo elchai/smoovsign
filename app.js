@@ -1790,6 +1790,8 @@ function fieldMouseDown(e, id) {
     DM.dragOffset = { x: (e.clientX - rect.left) / zoom - f.x, y: (e.clientY - rect.top) / zoom - f.y };
     DM.isDragging = true;
     DM.selectedFieldId = id;
+    // Listen on document so mouseup fires even outside the canvas area
+    document.addEventListener('mouseup', _globalMouseUp, { once: true });
 }
 
 function fieldTouchStart(e, id) {
@@ -1806,6 +1808,7 @@ function resizeMouseDown(e, id, handle) {
     DM.resizeStart = { x: e.clientX, y: e.clientY, w: f.w, h: f.h, fx: f.x, fy: f.y };
     DM.isResizing = true;
     DM.selectedFieldId = id;
+    document.addEventListener('mouseup', _globalMouseUp, { once: true });
 }
 
 function handleMouseMove(e) {
@@ -1853,6 +1856,10 @@ function handleMouseUp() {
     DM.isResizing = false;
     DM.resizeHandle = null;
     DM.dragItem = null;
+}
+
+function _globalMouseUp() {
+    if (DM.isDragging || DM.isResizing) handleMouseUp();
 }
 
 // ==================== STEP 4: SEND ====================
