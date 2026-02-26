@@ -3640,6 +3640,12 @@ async function loadAndCloneTemplate(tplId) {
         // Try local first (owner testing their own link)
         let tpl = DM.templates.find(t => t.id === tplId);
 
+        // If local template has no images, try loading from Firebase
+        if (tpl && !tpl.docImage && typeof storageDownloadImages === 'function') {
+            const imgs = await storageDownloadImages(tplId);
+            if (imgs) { tpl.docImage = imgs.docImage; tpl.docPages = imgs.docPages || []; }
+        }
+
         // If not found locally, load from Firebase
         if (!tpl && typeof firebaseLoadTemplate === 'function') {
             tpl = await firebaseLoadTemplate(tplId);

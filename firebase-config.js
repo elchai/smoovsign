@@ -15,6 +15,7 @@ const smoovFirebaseConfig = {
 
 let smoovDb = null;
 let smoovAuth = null;
+let smoovStorage = null;
 let smoovFirestoreReady = false;
 let smoovCurrentUser = null;
 
@@ -26,6 +27,7 @@ function initSmoovFirebase() {
         }
         smoovDb = firebase.firestore();
         smoovAuth = firebase.auth();
+        smoovStorage = firebase.storage();
         smoovFirestoreReady = true;
         console.log('SmoovSign Firebase initialized');
 
@@ -89,11 +91,82 @@ function closeUserDropdown() {
     if (dd) dd.classList.add('hidden');
 }
 
+// ==================== FIREBASE STORAGE (images) ====================
+async function storageUploadImages(id, docImage, docPages) {
+    if (!smoovStorage) return false;
+    try {
+        // Upload main image
+        if (docImage) {
+            const ref = smoovStorage.ref(`docs/${id}/docImage`);
+            await ref.putString(docImage, 'data_url');
+        }
+        // Upload pages
+        if (docPages && docPages.length > 0) {
+            for (let i = 0; i < docPages.length; i++) {
+                if (docPages[i]) {
+                    const ref = smoovStorage.ref(`docs/${id}/page_${i}`);
+                    await ref.putString(docPages[i], 'data_url');
+                }
+            }
+            // Save page count for loading
+            const metaRef = smoovStorage.ref(`docs/${id}/_meta.json`);
+            await metaRef.putString(JSON.stringify({ pageCount: docPages.length }), 'raw', { contentType: 'application/json' });
+        }
+        return true;
+    } catch (err) {
+        console.warn('Storage upload error:', err);
+        return false;
+    }
+}
+
+async function storageDownloadImages(id) {
+    if (!smoovStorage) return null;
+    try {
+        let docImage = null;
+        let docPages = [];
+        // Download main image
+        try {
+            const url = await smoovStorage.ref(`docs/${id}/docImage`).getDownloadURL();
+            const resp = await fetch(url);
+            docImage = await resp.text();
+        } catch (e) { /* no main image */ }
+        // Check for pages
+        try {
+            const metaUrl = await smoovStorage.ref(`docs/${id}/_meta.json`).getDownloadURL();
+            const metaResp = await fetch(metaUrl);
+            const meta = await metaResp.json();
+            for (let i = 0; i < meta.pageCount; i++) {
+                try {
+                    const pageUrl = await smoovStorage.ref(`docs/${id}/page_${i}`).getDownloadURL();
+                    const pageResp = await fetch(pageUrl);
+                    docPages.push(await pageResp.text());
+                } catch (e) { docPages.push(null); }
+            }
+        } catch (e) { /* no pages */ }
+        return (docImage || docPages.length > 0) ? { docImage, docPages } : null;
+    } catch (err) {
+        console.warn('Storage download error:', err);
+        return null;
+    }
+}
+
 // ==================== FIRESTORE ====================
+// Helper: strip large image data before Firestore save
+function _stripImages(obj) {
+    const copy = JSON.parse(JSON.stringify(obj));
+    delete copy.docImage;
+    delete copy.docPages;
+    return copy;
+}
+
 async function firebaseSaveDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_docs').doc(doc.id).set(JSON.parse(JSON.stringify(doc)));
+        // Save images to Storage, metadata to Firestore
+        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
+            storageUploadImages(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image upload bg error:', e));
+        }
+        await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
         return true;
     } catch (err) {
         console.warn('Firestore save doc error:', err);
@@ -105,8 +178,15 @@ async function firebaseLoadDoc(docId) {
     if (!smoovFirestoreReady || !smoovDb) return null;
     try {
         const snap = await smoovDb.collection('smoov_docs').doc(docId).get();
-        if (snap.exists) return snap.data();
-        return null;
+        if (!snap.exists) return null;
+        const data = snap.data();
+        // Load images from Storage
+        const imgs = await storageDownloadImages(docId);
+        if (imgs) {
+            if (imgs.docImage) data.docImage = imgs.docImage;
+            if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
+        }
+        return data;
     } catch (err) {
         console.warn('Firestore load doc error:', err);
         return null;
@@ -116,7 +196,11 @@ async function firebaseLoadDoc(docId) {
 async function firebaseUpdateDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_docs').doc(doc.id).set(JSON.parse(JSON.stringify(doc)));
+        // Upload images if present
+        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
+            storageUploadImages(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image upload bg error:', e));
+        }
+        await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
         return true;
     } catch (err) {
         console.warn('Firestore update doc error:', err);
@@ -129,7 +213,11 @@ async function firebaseUpdateDoc(doc) {
 async function firebaseSaveTemplate(tpl) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_docs').doc(tpl.id).set(JSON.parse(JSON.stringify(tpl)));
+        // Save images to Storage, metadata to Firestore
+        if (tpl.docImage || (tpl.docPages && tpl.docPages.length)) {
+            await storageUploadImages(tpl.id, tpl.docImage, tpl.docPages);
+        }
+        await smoovDb.collection('smoov_docs').doc(tpl.id).set(_stripImages(tpl));
         console.log('Template saved to Firebase:', tpl.id);
         return true;
     } catch (err) {
@@ -142,9 +230,16 @@ async function firebaseLoadTemplate(tplId) {
     if (!smoovFirestoreReady || !smoovDb) return null;
     try {
         const snap = await smoovDb.collection('smoov_docs').doc(tplId).get();
-        if (snap.exists) { console.log('Template loaded from Firebase:', tplId); return snap.data(); }
-        console.warn('Template not found in Firebase:', tplId);
-        return null;
+        if (!snap.exists) { console.warn('Template not found in Firebase:', tplId); return null; }
+        const data = snap.data();
+        // Load images from Storage
+        const imgs = await storageDownloadImages(tplId);
+        if (imgs) {
+            if (imgs.docImage) data.docImage = imgs.docImage;
+            if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
+        }
+        console.log('Template loaded from Firebase:', tplId);
+        return data;
     } catch (err) {
         console.warn('Firestore load template error:', err);
         return null;
