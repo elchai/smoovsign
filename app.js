@@ -461,13 +461,13 @@ function renderDocRows(docs, mode) {
         return `<div class="doc-table-row" onclick="openSign('${doc.id}')">
             <div class="dtc dtc-name">
                 <div>
-                    <div style="font-weight:600;font-size:0.9em;">${doc.fileName || 'מסמך ללא שם'}</div>
+                    <div style="font-weight:600;font-size:0.9em;">${esc(doc.fileName || 'מסמך ללא שם')}</div>
                     <div style="font-size:0.75em;color:var(--text-light);">${created}</div>
                 </div>
             </div>
             <div class="dtc dtc-rcpt">
-                <span class="avatar-initials">${rcptInitials}</span>
-                <span style="font-size:0.85em;">${rcptName || '-'}</span>
+                <span class="avatar-initials">${esc(rcptInitials)}</span>
+                <span style="font-size:0.85em;">${esc(rcptName || '-')}</span>
             </div>
             <div class="dtc dtc-status">
                 <span class="badge ${statusBadge}">${statusText}</span>
@@ -1094,7 +1094,7 @@ function renderFieldEditor(el) {
                             <select class="form-input" onchange="DM.activeRecipientId=Number(this.value);render();" style="font-weight:700;color:${rcptColor.text};background:${rcptColor.bg};border-color:${rcptColor.border};padding-right:30px;">
                                 ${DM.recipients.map(r => {
                                     const rc = DM.fieldColors[r.colorIndex % DM.fieldColors.length];
-                                    return `<option value="${r.id}" ${r.id === DM.activeRecipientId ? 'selected' : ''}>${r.name || 'נמען ' + (DM.recipients.indexOf(r) + 1)}</option>`;
+                                    return `<option value="${r.id}" ${r.id === DM.activeRecipientId ? 'selected' : ''}>${esc(r.name || 'נמען ' + (DM.recipients.indexOf(r) + 1))}</option>`;
                                 }).join('')}
                             </select>
                             <span class="rcpt-color-dot" style="background:${rcptColor.fill};"></span>
@@ -1314,7 +1314,7 @@ function renderFieldProps(f) {
         <div class="field-props-body">
             <div class="form-group">
                 <label class="form-label">תיאור השדה</label>
-                <input type="text" class="form-input" value="${f.label}" oninput="updateFieldLive(${f.id},'label',this.value)" onchange="updateField(${f.id},'label',this.value)" style="font-weight:600;">
+                <input type="text" class="form-input" value="${esc(f.label)}" oninput="updateFieldLive(${f.id},'label',this.value)" onchange="updateField(${f.id},'label',this.value)" style="font-weight:600;">
             </div>
             <div class="form-group">
                 <label class="form-label">סוג שדה</label>
@@ -1345,7 +1345,7 @@ function renderFieldProps(f) {
             </div>` : ''}
             <div class="form-group">
                 <label class="form-label">${f.type === 'file' ? 'הנחיה לחותם (סוג קובץ)' : f.fixed ? 'ערך קבוע' : 'ערך ברירת מחדל'}</label>
-                <input type="text" class="form-input" value="${f.value || ''}" onchange="updateField(${f.id},'value',this.value)" placeholder="${f.type === 'file' ? 'לדוגמה: צלם תעודת זהות...' : f.fixed ? 'הזן ערך שימולא אוטומטית...' : 'מה יוצג בשדה...'}">
+                <input type="text" class="form-input" value="${esc(f.value || '')}" onchange="updateField(${f.id},'value',this.value)" placeholder="${f.type === 'file' ? 'לדוגמה: צלם תעודת זהות...' : f.fixed ? 'הזן ערך שימולא אוטומטית...' : 'מה יוצג בשדה...'}">
             </div>
         </div>
         <div style="padding:12px;border-top:1px solid var(--border);background:var(--bg);">
@@ -1362,7 +1362,7 @@ function renderFieldOnCanvas(f) {
     const selected = DM.selectedFieldId === f.id;
     const typeLabels = { signature: 'חתימה', date: 'תאריך', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: '☑', stamp: '✓', file: 'קובץ', text: 'שדה טקסט', number: 'מספר' };
     const typeIcons = { signature: ICO.sign, file: ICO.doc, date_auto: ICO.calendar, date_manual: ICO.calendar, fullname: ICO.user, id_number: ICO.id, checkbox: ICO.checkbox };
-    const displayText = f.value || typeLabels[f.type] || f.label || 'טקסט';
+    const displayText = esc(f.value || typeLabels[f.type] || f.label || 'טקסט');
     const fieldIcon = typeIcons[f.type] || '';
 
     return `<div class="field-box ${selected ? 'selected' : ''}" data-fid="${f.id}"
@@ -1372,12 +1372,12 @@ function renderFieldOnCanvas(f) {
         ${selected ? (() => {
             const rcptName = assignee ? (assignee.name || 'נמען ' + (DM.recipients.indexOf(assignee) + 1)) : '';
             return `
-            <div class="field-label-tag" style="background:${c.fill};">${f.label}${f.required ? ' *' : ''}</div>
+            <div class="field-label-tag" style="background:${c.fill};">${esc(f.label)}${f.required ? ' *' : ''}</div>
             <div class="field-toolbar">
                 <button onclick="event.stopPropagation();deleteField(${f.id})" title="מחק">${ICO.trash}</button>
                 <button onclick="event.stopPropagation();duplicateField(${f.id})" title="שכפל">${ICO.copy}</button>
                 <button onclick="event.stopPropagation();editFieldInline(${f.id})" title="ערוך">${ICO.edit}</button>
-                <span class="toolbar-rcpt-badge" style="background:${c.fill};">${rcptName} <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.bg};margin-right:4px;vertical-align:middle;"></span></span>
+                <span class="toolbar-rcpt-badge" style="background:${c.fill};">${esc(rcptName)} <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.bg};margin-right:4px;vertical-align:middle;"></span></span>
             </div>
             <div class="resize-handle" style="top:-4px;left:-4px;border-color:${c.fill};cursor:nw-resize;" onmousedown="resizeMouseDown(event,${f.id},'nw')"></div>
             <div class="resize-handle" style="top:-4px;right:-4px;border-color:${c.fill};cursor:ne-resize;" onmousedown="resizeMouseDown(event,${f.id},'ne')"></div>
@@ -1514,15 +1514,15 @@ function editFieldInline(id) {
 
     if (f.type === 'date_manual') {
         // Date picker input
-        inner.innerHTML = `<input type="date" class="inline-edit-input" value="${f.value || ''}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;cursor:text;">`;
+        inner.innerHTML = `<input type="date" class="inline-edit-input" value="${esc(f.value || '')}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;cursor:text;">`;
         const inp = inner.querySelector('input');
         inp.focus();
         inp.onchange = () => { f.value = inp.value ? new Date(inp.value).toLocaleDateString('he-IL') : ''; render(); };
         inp.onblur = () => render();
     } else {
         // Text input for: text, number, fullname, id_number, file
-        const placeholder = f.type === 'file' ? 'סוג קובץ נדרש...' : f.label || 'הזן ערך...';
-        inner.innerHTML = `<input type="${f.type === 'number' ? 'number' : 'text'}" class="inline-edit-input" value="${f.value || ''}" placeholder="${placeholder}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;padding:0 4px;color:#1e293b;">`;
+        const placeholder = f.type === 'file' ? 'סוג קובץ נדרש...' : esc(f.label || 'הזן ערך...');
+        inner.innerHTML = `<input type="${f.type === 'number' ? 'number' : 'text'}" class="inline-edit-input" value="${esc(f.value || '')}" placeholder="${placeholder}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:600;text-align:center;outline:none;padding:0 4px;color:#1e293b;">`;
         const inp = inner.querySelector('input');
         inp.focus();
         inp.select();
@@ -1850,8 +1850,8 @@ function renderSend(el) {
                         const fc = rfc > 0 ? rfc : DM.fields.filter(f => !f.fixed).length;
                         return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:6px;">
                             <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};flex-shrink:0;"></span>
-                            <span style="font-weight:600;font-size:0.88em;">${r.name || 'ללא שם'}</span>
-                            <span style="font-size:0.78em;color:var(--text-light);direction:ltr;">${r.phone || ''}</span>
+                            <span style="font-weight:600;font-size:0.88em;">${esc(r.name || 'ללא שם')}</span>
+                            <span style="font-size:0.78em;color:var(--text-light);direction:ltr;">${esc(r.phone || '')}</span>
                             <span style="margin-right:auto;font-size:0.72em;background:var(--card);padding:2px 8px;border-radius:10px;">${fc} שדות</span>
                         </div>`;
                     }).join('')}
@@ -1938,7 +1938,7 @@ function showLinkSuccess(doc) {
                 return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--bg);border-radius:10px;">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span style="font-weight:700;color:var(--primary);font-size:0.9em;">${i + 1}</span>
-                        <span style="font-weight:600;">${r.name || 'נמען ' + (i + 1)}</span>
+                        <span style="font-weight:600;">${esc(r.name || 'נמען ' + (i + 1))}</span>
                     </div>
                     <button class="btn btn-sm" onclick="copySignLink(this,'${signUrl}')" style="background:var(--primary-light);color:var(--primary);border:1px solid #93c5fd;display:flex;align-items:center;gap:6px;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
@@ -2437,7 +2437,7 @@ function renderSignView(el) {
                         return `<div class="recipient-status-card">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                                 <span style="width:8px;height:8px;border-radius:50%;background:${c.fill};"></span>
-                                <span style="font-weight:600;font-size:0.88em;flex:1;">${r.name || 'נמען'}</span>
+                                <span style="font-weight:600;font-size:0.88em;flex:1;">${esc(r.name || 'נמען')}</span>
                                 ${r.signed ? '<span class="badge badge-success" style="font-size:0.65em;">חתם</span>' : `<span class="badge badge-warning" style="font-size:0.65em;">ממתין</span>`}
                             </div>
                             <div class="mini-progress"><div class="mini-progress-fill" style="width:${rpct}%;background:${c.fill};"></div></div>
