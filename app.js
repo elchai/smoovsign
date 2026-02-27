@@ -1968,7 +1968,7 @@ function showLinkSuccess(doc) {
                 </button>
             </div>`}
         </div>
-        ${!DM._fromTemplate ? `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
+        ${!doc._fromTemplate ? `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
             <h3 style="font-weight:700;margin-bottom:6px;">צור תבנית</h3>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">שלחת מסמך שאינו תבנית. חסוך זמן בפעם הבאה על ידי יצירת תבנית ממנו.</p>
             <button class="btn btn-outline" onclick="saveAsTemplateFromDoc('${doc.id}')">שמור כתבנית</button>
@@ -2045,6 +2045,7 @@ function sendDocument() {
             createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
             ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
             expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
+            _fromTemplate: !!DM._fromTemplate,
             audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
         };
         DM.docs.push(doc);
