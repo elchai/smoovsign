@@ -535,11 +535,11 @@ function renderContacts(el) {
                 ${contacts.map(c => `
                     <div class="doc-table-row">
                         <div class="dtc" style="flex:2;display:flex;align-items:center;gap:8px;">
-                            <span class="avatar-initials">${(c.name || '?').split(' ').map(w => w[0]).join('').substring(0, 2)}</span>
-                            <span style="font-weight:600;">${c.name || '-'}</span>
+                            <span class="avatar-initials">${esc((c.name || '?').split(' ').map(w => w[0]).join('').substring(0, 2))}</span>
+                            <span style="font-weight:600;">${esc(c.name || '-')}</span>
                         </div>
-                        <div class="dtc" style="flex:2;font-size:0.85em;color:var(--text-light);direction:ltr;">${c.email || '-'}</div>
-                        <div class="dtc" style="flex:1;font-size:0.85em;">${c.phone || '-'}</div>
+                        <div class="dtc" style="flex:2;font-size:0.85em;color:var(--text-light);direction:ltr;">${esc(c.email || '-')}</div>
+                        <div class="dtc" style="flex:1;font-size:0.85em;">${esc(c.phone || '-')}</div>
                         <div class="dtc" style="flex:1;display:flex;gap:4px;">
                             <button class="btn btn-primary btn-sm" onclick="editContact('${c.id}')">עריכה</button>
                             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteContact('${c.id}')">מחק</button>
@@ -705,6 +705,7 @@ function useTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
+    DM.docPages = tpl.docPages || [];
     DM.pageHeights = tpl.pageHeights || [];
     DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
@@ -725,6 +726,7 @@ function editTemplate(id) {
     if (!tpl) return;
     resetEditor();
     DM.docImage = tpl.docImage;
+    DM.docPages = tpl.docPages || [];
     DM.pageHeights = tpl.pageHeights || [];
     DM.pageWidth = tpl.pageWidth || 0;
     DM.fileName = tpl.name;
@@ -1001,11 +1003,11 @@ function renderRecipients(el) {
                 <div class="recipient-num">${i + 1}</div>
                 <div class="recipient-fields">
                     <div class="input-wrap">
-                        <input type="text" value="${r.name}" placeholder="שם הנמען" oninput="updateRecipient(${r.id},'name',this.value)">
+                        <input type="text" value="${esc(r.name)}" placeholder="שם הנמען" oninput="updateRecipient(${r.id},'name',this.value)">
                         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <div class="input-wrap">
-                        <input type="tel" value="${r.phone || ''}" placeholder="מספר טלפון" oninput="updateRecipient(${r.id},'phone',this.value)" style="direction:ltr;text-align:right;">
+                        <input type="tel" value="${esc(r.phone || '')}" placeholder="מספר טלפון" oninput="updateRecipient(${r.id},'phone',this.value)" style="direction:ltr;text-align:right;">
                         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72"/></svg>
                     </div>
                 </div>
@@ -2010,52 +2012,59 @@ function sendDocument() {
     _sendingDoc = true;
     const sendBtn = document.querySelector('.btn-success.btn-lg');
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'שולח...'; }
-    const now = new Date().toISOString();
-    const expiryInput = document.getElementById('docExpiry');
-    const doc = {
-        id: 'dm_' + Date.now(),
-        fileName: DM.fileName || 'מסמך ללא שם',
-        docImage: DM.docImage,
-        docPages: DM.docPages || [],
-        pageHeights: DM.pageHeights || [],
-        pageWidth: DM.pageWidth || 0,
-        recipients: JSON.parse(JSON.stringify(DM.recipients)),
-        fields: JSON.parse(JSON.stringify(DM.fields)),
-        status: 'sent',
-        createdAt: now,
-        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
-        ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
-        expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
-        audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
-    };
-    DM.docs.push(doc);
-    save();
+    try {
+        const now = new Date().toISOString();
+        const expiryInput = document.getElementById('docExpiry');
+        const doc = {
+            id: 'dm_' + Date.now(),
+            fileName: DM.fileName || 'מסמך ללא שם',
+            docImage: DM.docImage,
+            docPages: DM.docPages || [],
+            pageHeights: DM.pageHeights || [],
+            pageWidth: DM.pageWidth || 0,
+            recipients: JSON.parse(JSON.stringify(DM.recipients)),
+            fields: JSON.parse(JSON.stringify(DM.fields)),
+            status: 'sent',
+            createdAt: now,
+            createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
+            ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
+            expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
+            audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
+        };
+        DM.docs.push(doc);
+        save();
 
-    // Save to Firebase for cross-browser signing
-    if (typeof firebaseSaveDoc === 'function') {
-        firebaseSaveDoc(doc).then(ok => {
-            if (ok) console.log('Document saved to Firebase');
-        });
-    }
-
-    // WhatsApp notifications
-    const msg = document.getElementById('sendMessage')?.value || '';
-    DM.recipients.forEach(r => {
-        if (r.phone) {
-            const phone = r.phone.replace(/[^0-9]/g, '');
-            if (phone.length >= 9) {
-                const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
-                const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
-                const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${signUrl}`;
-                window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
-            }
+        // Save to Firebase for cross-browser signing
+        if (typeof firebaseSaveDoc === 'function') {
+            firebaseSaveDoc(doc).then(ok => {
+                if (ok) console.log('Document saved to Firebase');
+            });
         }
-    });
 
-    _sendingDoc = false;
-    toast('המסמך נשלח בהצלחה!');
-    resetEditor();
-    showLinkSuccess(doc);
+        // WhatsApp notifications
+        const msg = document.getElementById('sendMessage')?.value || '';
+        DM.recipients.forEach(r => {
+            if (r.phone) {
+                const phone = r.phone.replace(/[^0-9]/g, '');
+                if (phone.length >= 9) {
+                    const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
+                    const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+                    const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${signUrl}`;
+                    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                }
+            }
+        });
+
+        toast('המסמך נשלח בהצלחה!');
+        resetEditor();
+        showLinkSuccess(doc);
+    } catch (err) {
+        console.error('Send document error:', err);
+        toast('שגיאה בשליחת המסמך: ' + (err.message || 'נסה שוב'), 'error');
+    } finally {
+        _sendingDoc = false;
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'שלח מסמך'; }
+    }
 }
 
 // ==================== SAVE TEMPLATE ====================
@@ -3872,8 +3881,9 @@ function openSharedDocument(linkId) {
                 if (doc.exists) {
                     const sharedDoc = doc.data();
                     if (isValidSharedDocument(sharedDoc)) {
-                        // Cache it locally for faster future access (strip password for security)
-                        const cacheData = { ...sharedDoc, settings: { ...sharedDoc.settings, password: undefined } };
+                        // Cache locally - replace actual password with boolean flag for security
+                        const hasPass = !!sharedDoc.settings.password;
+                        const cacheData = { ...sharedDoc, settings: { ...sharedDoc.settings, password: hasPass ? '__protected__' : '' } };
                         localStorage.setItem(`shared_doc_${linkId}`, JSON.stringify(cacheData));
                         renderSharedDocument(sharedDoc);
                         return;
@@ -3981,16 +3991,23 @@ function verifySharePassword(linkId) {
         return;
     }
 
-    const sharedDocData = localStorage.getItem(`shared_doc_${linkId}`);
-    if (sharedDocData) {
-        const sharedDoc = JSON.parse(sharedDocData);
-        if (sharedDoc.settings.password === password) {
-            sessionStorage.setItem(`share_auth_${linkId}`, 'true');
-            renderSharedDocument(sharedDoc);
-        } else {
-            errorDiv.textContent = 'סיסמה שגויה';
+    // Always verify password against Firebase (cache only stores a flag, not the actual password)
+    if (typeof smoovDb !== 'undefined' && smoovDb) {
+        errorDiv.style.display = 'none';
+        smoovDb.collection('shared_documents').doc(linkId).get().then(doc => {
+            if (doc.exists && doc.data().settings.password === password) {
+                sessionStorage.setItem(`share_auth_${linkId}`, 'true');
+                const sharedDocData = localStorage.getItem(`shared_doc_${linkId}`);
+                const sharedDoc = sharedDocData ? JSON.parse(sharedDocData) : doc.data();
+                renderSharedDocument(sharedDoc);
+            } else {
+                errorDiv.textContent = 'סיסמה שגויה';
+                errorDiv.style.display = 'block';
+            }
+        }).catch(() => {
+            errorDiv.textContent = 'שגיאה באימות הסיסמה, נסה שוב';
             errorDiv.style.display = 'block';
-        }
+        });
     } else {
         errorDiv.textContent = 'שגיאה בטעינת המסמך, נסה לרענן את הדף';
         errorDiv.style.display = 'block';
@@ -4203,6 +4220,7 @@ function onAuthStateChanged(user) {
         DM.templates = DM.templates.filter(t =>
             !t.ownerUid || t.ownerUid === uid || t.createdBy === email
         );
+        save(); // Persist filtered data so localStorage stays in sync
 
         const isFillLink = hash.startsWith('#fill/');
         if (isFillLink) {
