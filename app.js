@@ -884,6 +884,11 @@ async function processFile(file) {
             const buf = await file.arrayBuffer();
             const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
             const numPages = pdf.numPages;
+            if (numPages === 0) {
+                toast('הקובץ ריק (0 עמודים)', 'error');
+                render();
+                return;
+            }
 
             // Render all pages and combine into one tall image
             const pageCanvases = [];
@@ -973,11 +978,11 @@ function renderRecipients(el) {
                 <div class="recipient-num">${i + 1}</div>
                 <div class="recipient-fields">
                     <div class="input-wrap">
-                        <input type="text" value="${r.name}" placeholder="שם הנמען" onchange="updateRecipient(${r.id},'name',this.value)">
+                        <input type="text" value="${r.name}" placeholder="שם הנמען" oninput="updateRecipient(${r.id},'name',this.value)">
                         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                     <div class="input-wrap">
-                        <input type="tel" value="${r.phone || ''}" placeholder="מספר טלפון" onchange="updateRecipient(${r.id},'phone',this.value)" style="direction:ltr;text-align:right;">
+                        <input type="tel" value="${r.phone || ''}" placeholder="מספר טלפון" oninput="updateRecipient(${r.id},'phone',this.value)" style="direction:ltr;text-align:right;">
                         <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72"/></svg>
                     </div>
                 </div>
@@ -2116,6 +2121,8 @@ function copyTemplateFillLink(btn, tplId) {
 async function openSign(docId) {
     DM.signDocId = docId;
     DM._signFieldIdx = -1; // Reset field navigation index for new document
+    DM._currentSigner = null; // Reset signer identity for new document
+    DM._currentSignerEmail = null;
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
 
@@ -2737,11 +2744,12 @@ async function downloadSignedPDF(docId) {
             await _downloadPdfCanvasFallback(doc);
         }
 
-        container.remove();
         toast('ה-PDF הורד בהצלחה!');
     } catch (err) {
         console.error('PDF generation error:', err);
         toast('שגיאה בהורדת הקובץ: ' + (err.message || 'נסה שוב'), 'error');
+    } finally {
+        if (container && container.parentNode) container.remove();
     }
 }
 
@@ -2911,7 +2919,13 @@ async function syncOwnerDocsFromFirebase(ownerEmail) {
                 DM.docs.push(remoteDoc);
                 added++;
             } else if (remoteDoc.status === 'completed' && DM.docs[localIdx].status !== 'completed') {
-                DM.docs[localIdx] = remoteDoc;
+                // Preserve locally-loaded images (Firebase docs don't have docImage/docPages)
+                const localDoc = DM.docs[localIdx];
+                DM.docs[localIdx] = {
+                    ...remoteDoc,
+                    docImage: localDoc.docImage || remoteDoc.docImage,
+                    docPages: (localDoc.docPages && localDoc.docPages.length > 0) ? localDoc.docPages : remoteDoc.docPages
+                };
                 added++;
             }
         });
@@ -3829,8 +3843,9 @@ function openSharedDocument(linkId) {
                 if (doc.exists) {
                     const sharedDoc = doc.data();
                     if (isValidSharedDocument(sharedDoc)) {
-                        // Cache it locally for faster future access
-                        localStorage.setItem(`shared_doc_${linkId}`, JSON.stringify(sharedDoc));
+                        // Cache it locally for faster future access (strip password for security)
+                        const cacheData = { ...sharedDoc, settings: { ...sharedDoc.settings, password: undefined } };
+                        localStorage.setItem(`shared_doc_${linkId}`, JSON.stringify(cacheData));
                         renderSharedDocument(sharedDoc);
                         return;
                     }
