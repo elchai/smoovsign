@@ -171,9 +171,23 @@ function smoovConfirm(message) {
             </div>
         </div>`;
         document.body.appendChild(overlay);
-        overlay.querySelector('#_confirmYes').onclick = () => { overlay.remove(); resolve(true); };
-        overlay.querySelector('#_confirmNo').onclick = () => { overlay.remove(); resolve(false); };
+        const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', escH); resolve(false); };
+        const confirm = () => { overlay.remove(); document.removeEventListener('keydown', escH); resolve(true); };
+        overlay.querySelector('#_confirmYes').onclick = confirm;
+        overlay.querySelector('#_confirmNo').onclick = dismiss;
+        overlay.onclick = e => { if (e.target === overlay) dismiss(); };
+        const escH = e => { if (e.key === 'Escape') dismiss(); };
+        document.addEventListener('keydown', escH);
     });
+}
+
+function friendlyError(err) {
+    const m = (err && err.message) || '';
+    if (m.includes('permission') || m.includes('PERMISSION_DENIED')) return 'אין הרשאה לבצע פעולה זו';
+    if (m.includes('quota') || m.includes('QuotaExceeded')) return 'נגמר מקום האחסון';
+    if (m.includes('network') || m.includes('offline') || m.includes('Failed to fetch')) return 'בעיית חיבור לאינטרנט';
+    if (m.includes('not-found') || m.includes('NOT_FOUND')) return 'הפריט לא נמצא';
+    return 'נסה שוב';
 }
 
 function toast(msg, type = 'success') {
@@ -587,6 +601,7 @@ function openContactModal(contact) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
     setTimeout(() => document.getElementById('ctName').focus(), 100);
 }
 
@@ -1600,6 +1615,7 @@ function openEditorSignature(fieldId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) cancelEditorSignCanvas(); };
 
     const canvas = document.getElementById('editorSignCanvas');
     const ctx = canvas.getContext('2d');
@@ -1917,7 +1933,7 @@ function createLinkOnly() {
         showLinkSuccess(doc);
     } catch (err) {
         console.error('createLinkOnly error:', err);
-        toast('שגיאה ביצירת קישור: ' + err.message, 'error');
+        toast('שגיאה ביצירת קישור: ' + friendlyError(err), 'error');
     }
 }
 
@@ -2060,7 +2076,7 @@ function sendDocument() {
         showLinkSuccess(doc);
     } catch (err) {
         console.error('Send document error:', err);
-        toast('שגיאה בשליחת המסמך: ' + (err.message || 'נסה שוב'), 'error');
+        toast('שגיאה בשליחת המסמך: ' + friendlyError(err), 'error');
     } finally {
         _sendingDoc = false;
         if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'שלח מסמך'; }
@@ -2109,7 +2125,7 @@ async function saveTemplate() {
         showTemplateLinkSuccess(tpl);
     } catch (err) {
         console.error('saveTemplate error:', err);
-        toast('שגיאה בשמירת התבנית: ' + err.message, 'error');
+        toast('שגיאה בשמירת התבנית: ' + friendlyError(err), 'error');
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = origText; }
     }
 }
@@ -2621,6 +2637,7 @@ function exitAndSave(docId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
 }
 
 function refuseSign(docId) {
@@ -2637,6 +2654,7 @@ function refuseSign(docId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
 }
 
 function confirmRefuseSign(docId) {
@@ -2786,7 +2804,7 @@ async function downloadSignedPDF(docId) {
         toast('ה-PDF הורד בהצלחה!');
     } catch (err) {
         console.error('PDF generation error:', err);
-        toast('שגיאה בהורדת הקובץ: ' + (err.message || 'נסה שוב'), 'error');
+        toast('שגיאה בהורדת הקובץ: ' + friendlyError(err), 'error');
     } finally {
         if (container && container.parentNode) container.remove();
     }
@@ -3055,6 +3073,7 @@ function openSignatureCanvas(docId, fieldId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) cancelSignCanvas(); };
 
     // Setup draw canvas with enhanced drawing
     const canvas = document.getElementById('signCanvas');
@@ -3359,6 +3378,7 @@ function openDatePicker(docId, fieldId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) closeDatePicker(); };
     // Set default to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('datePickerInput').value = today;
@@ -3416,6 +3436,7 @@ function openFilePicker(docId, fieldId) {
         </div>
     </div>`;
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) closeFilePicker(); };
 }
 
 function previewFileAttachment(input) {
@@ -3597,7 +3618,7 @@ function completeSign(docId) {
     }
   } catch (err) {
     console.error('completeSign error:', err);
-    toast('שגיאה באישור החתימה: ' + err.message, 'error');
+    toast('שגיאה באישור החתימה: ' + friendlyError(err), 'error');
   }
 }
 
@@ -3656,6 +3677,7 @@ function openShareModal(docId) {
     `;
 
     document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) closeShareModal(); };
 
     // Focus on URL input for easy copying
     setTimeout(() => {
@@ -3839,6 +3861,8 @@ function checkUrlHash() {
         }
         // Document not in localStorage - try loading from Firebase
         if (typeof firebaseLoadDoc === 'function') {
+            const main = document.getElementById('mainContent');
+            if (main) main.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 20px;"><div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;"></div><p style="color:var(--text-light);font-size:0.9em;">טוען מסמך...</p></div>';
             firebaseLoadDoc(docId).then(remoteDoc => {
                 if (remoteDoc) {
                     // Add to local docs so it renders
