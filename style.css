@@ -27,6 +27,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; direction: rtl; }
 input, select, textarea, button { font-family: var(--font); }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== Top Bar ==================== */
 .topbar {
@@ -85,6 +86,7 @@ input, select, textarea, button { font-family: var(--font); }
     width: 240px; min-width: 240px; background: var(--card); border-left: 1px solid var(--border);
     overflow-y: auto; display: flex; flex-direction: column; padding: 12px 0;
 }
+.sidebar-backdrop { display: none; }
 .app-layout > main { flex: 1; overflow-y: auto; }
 
 /* Sidebar send button */
@@ -131,9 +133,9 @@ input, select, textarea, button { font-family: var(--font); }
     font-size: 0.6em; color: var(--text-light); opacity: 0.6;
 }
 .sidebar-group-header.open .sidebar-arrow { transform: rotate(180deg); }
-.sidebar-group-items { display: none; padding: 0; }
+.sidebar-group-items { display: none; padding: 0; overflow: hidden; }
 .sidebar-group-items.open { display: block; }
-.sidebar-group-items .sidebar-sub { min-height: 32px; }
+.sidebar-group-items .sidebar-sub { min-height: 32px; position: relative; z-index: 1; }
 .sidebar-divider { height: 1px; background: var(--border); margin: 8px 14px; }
 
 /* Full-screen views (wizard/sign) hide sidebar */
@@ -553,11 +555,6 @@ select.form-input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns
 /* ==================== Signing Page ==================== */
 .sign-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 24px; background: var(--card); border-bottom: 1px solid var(--border);
-}
-/* Sign header */
-.sign-header {
-    display: flex; align-items: center; justify-content: space-between;
     padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border);
     flex-wrap: wrap; gap: 8px;
 }
@@ -732,10 +729,10 @@ input[type="range"]::-moz-range-thumb {
 
 /* ==================== Audit Panel ==================== */
 .audit-panel {
-    position: absolute; top: 0; left: 0; width: 360px; height: 100%;
+    position: absolute; top: 0; right: 0; width: 360px; height: 100%;
     background: var(--card); border-left: 1px solid var(--border);
     box-shadow: var(--shadow-lg); z-index: 200; display: flex; flex-direction: column;
-    animation: slideInLeft 0.2s ease;
+    animation: slideInRight 0.2s ease;
 }
 .audit-panel.hidden { display: none; }
 .audit-header {
@@ -748,7 +745,7 @@ input[type="range"]::-moz-range-thumb {
     border-bottom: 1px solid var(--border);
 }
 .audit-icon { font-size: 1.1em; width: 24px; text-align: center; flex-shrink: 0; }
-@keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
 /* ==================== Mini Progress Bar ==================== */
 .mini-progress { height: 3px; background: var(--bg); border-radius: 2px; overflow: hidden; }

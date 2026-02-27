@@ -33,6 +33,9 @@ const DM = {
     ]
 };
 
+// HTML-escape to prevent XSS from user-controlled strings
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 // SVG Icons (monochrome, no emoji)
 const ICO = {
     edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
@@ -593,101 +596,7 @@ function deleteContact(id) {
 // ==================== SHARE FUNCTIONALITY ====================
 // openShareModal is defined later (near shared document section)
 
-function generateShareLink(docId) {
-    const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) return;
-
-    // Generate unique link ID
-    const linkId = generateId();
-
-    // Collect share settings
-    const requirePassword = document.getElementById('requirePassword').checked;
-    const password = requirePassword ? document.getElementById('sharePassword').value : null;
-    const setExpiry = document.getElementById('setExpiry').checked;
-    const expiry = setExpiry ? document.getElementById('expiryDate').value : null;
-    const limitViews = document.getElementById('limitViews').checked;
-    const maxViews = limitViews ? parseInt(document.getElementById('maxViews').value) || null : null;
-
-    if (requirePassword && !password) {
-        toast('יש להזין סיסמה', 'error');
-        return;
-    }
-
-    if (setExpiry && !expiry) {
-        toast('יש להגדיר תאריך תוקף', 'error');
-        return;
-    }
-
-    if (limitViews && (!maxViews || maxViews < 1)) {
-        toast('יש להזין מספר צפיות תקין', 'error');
-        return;
-    }
-
-    // Create share object
-    const shareSettings = {
-        linkId: linkId,
-        createdAt: new Date().toISOString(),
-        password: password,
-        expiresAt: expiry ? new Date(expiry).toISOString() : null,
-        maxViews: maxViews,
-        viewCount: 0,
-        isActive: true
-    };
-
-    // Save to document
-    doc.publicShare = shareSettings;
-    save();
-
-    // Save to Firebase if available
-    if (window.db && firebase.auth().currentUser) {
-        const shareDoc = {
-            docId: doc.id,
-            linkId: linkId,
-            docData: {
-                fileName: doc.fileName,
-                docImage: doc.docImage,
-                docPages: doc.docPages,
-                fields: doc.fields,
-                recipients: doc.recipients
-            },
-            settings: shareSettings,
-            ownerId: firebase.auth().currentUser.uid
-        };
-
-        window.db.collection('shared_documents').doc(linkId).set(shareDoc)
-            .catch(err => console.error('Error saving to Firebase:', err));
-    }
-
-    // Update UI
-    const baseUrl = window.location.origin + window.location.pathname;
-    const publicUrl = `${baseUrl}#share/${linkId}`;
-    document.getElementById('publicLink').value = publicUrl;
-    document.getElementById('copyBtn').disabled = false;
-    document.querySelector('.btn.btn-primary').textContent = 'עדכון קישור';
-
-    toast('קישור נוצר בהצלחה!', 'success');
-}
-
-function copyToClipboard(text) {
-    if (!text) return;
-
-    navigator.clipboard.writeText(text).then(() => {
-        toast('הקישור הועתק!', 'success');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        toast('הקישור הועתק!', 'success');
-    });
-}
-
-function generateId() {
-    return 'sh_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-}
+// generateShareLink removed - replaced by openShareModal which generates links directly
 
 // ==================== TEMPLATES ====================
 if (!DM._tplSelected) DM._tplSelected = {};
@@ -2206,6 +2115,7 @@ function copyTemplateFillLink(btn, tplId) {
 // ==================== SIGNING VIEW ====================
 async function openSign(docId) {
     DM.signDocId = docId;
+    DM._signFieldIdx = -1; // Reset field navigation index for new document
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
 
@@ -2224,7 +2134,7 @@ async function openSign(docId) {
 
     // If user is logged in - check if they're the owner or a signer
     if (isLoggedIn) {
-        const isOwner = !doc.ownerUid || doc.ownerUid === smoovCurrentUser.uid;
+        const isOwner = (doc.ownerUid && doc.ownerUid === smoovCurrentUser.uid) || (!doc.ownerUid && doc.createdBy && doc.createdBy === smoovCurrentUser.email);
         if (isOwner) {
             // Owner view - full access
             DM._currentSigner = null;
@@ -2264,7 +2174,7 @@ function showSignerVerification(doc) {
             </div>
             <h2 style="font-size:1.2em;margin-bottom:4px;">אימות זהות</h2>
             <p style="color:var(--text-light);margin-bottom:4px;font-size:0.88em;">נא להזדהות לפני חתימה על</p>
-            <p style="color:var(--text);font-weight:700;margin-bottom:14px;font-size:0.92em;">"${doc.fileName}"</p>
+            <p style="color:var(--text);font-weight:700;margin-bottom:14px;font-size:0.92em;">"${esc(doc.fileName)}"</p>
             <button class="google-signin-btn" onclick="googleSignForSigner('${doc.id}')" style="width:100%;margin-bottom:12px;justify-content:center;">
                 <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                 התחבר עם Google
@@ -2397,7 +2307,7 @@ function renderSignView(el) {
         <!-- Doc name + page info -->
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 20px;background:var(--bg);border-bottom:1px solid var(--border);font-size:0.85em;">
             <span style="color:var(--text-light);">עמוד ${DM._signActivePage || 1} מתוך ${numPages || 1}</span>
-            <span style="font-weight:700;">${doc.fileName || 'מסמך'}</span>
+            <span style="font-weight:700;">${esc(doc.fileName || 'מסמך')}</span>
         </div>
         <!-- Progress bar -->
         <div class="sign-progress" style="height:4px;">
@@ -2460,10 +2370,10 @@ function renderSignView(el) {
                             ${f.required && canSign ? 'title="שדה חובה"' : ''}>
                             ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
                               f.fileData ? `<img src="${f.fileData}" style="width:100%;height:100%;object-fit:contain;" alt="קובץ מצורף">` :
-                              val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;">${val}</span>` :
-                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">${typeLabels[f.type] || f.label}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
-                              f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;">${f.value}</span>` :
-                              `<span style="font-size:0.75em;color:#888;font-weight:600;">${f.label}</span>`}
+                              val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;">${esc(val)}</span>` :
+                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">${esc(typeLabels[f.type] || f.label)}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
+                              f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;">${esc(f.value)}</span>` :
+                              `<span style="font-size:0.75em;color:#888;font-weight:600;">${esc(f.label)}</span>`}
                         </div>`;
                     }).join('')}
                 </div>
@@ -2567,33 +2477,49 @@ function navigateSignField(docId, direction) {
         signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
     }
 
-    // Get fillable fields for current user
-    const fillableFields = (doc.fields || []).filter(f => {
+    // Get ALL relevant fields (including signed) - stable index that doesn't shift
+    const allMyFields = (doc.fields || []).filter(f => {
         if (f.fixed) return false;
         if (isSignerView && signerRecipient && f.assigneeId !== signerRecipient.id) return false;
-        return !f.signedValue;
+        return true;
     });
 
-    if (fillableFields.length === 0) return;
+    if (allMyFields.length === 0) return;
 
-    // Validate current required field before advancing
-    if (direction === 'next' && DM._signFieldIdx >= 0 && DM._signFieldIdx < fillableFields.length) {
-        const currentField = fillableFields[DM._signFieldIdx];
-        if (currentField && currentField.required && !currentField.signedValue) {
-            toast('יש למלא שדה חובה זה לפני המעבר', 'error');
-            highlightNextFieldById(currentField.id);
-            return;
-        }
-    }
+    // Clamp index to valid range
+    if (DM._signFieldIdx < 0) DM._signFieldIdx = -1;
 
     if (direction === 'next') {
-        DM._signFieldIdx = Math.min((DM._signFieldIdx || 0) + 1, fillableFields.length - 1);
-        if (DM._signFieldIdx < 0) DM._signFieldIdx = 0;
+        // Find the next unsigned field after current index
+        let startIdx = DM._signFieldIdx + 1;
+        let found = false;
+        for (let i = startIdx; i < allMyFields.length; i++) {
+            if (!allMyFields[i].signedValue) {
+                DM._signFieldIdx = i;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // No more unsigned fields - stay at current position
+            updateSignNavButton(docId);
+            return;
+        }
     } else {
-        DM._signFieldIdx = Math.max((DM._signFieldIdx || 0) - 1, 0);
+        // Find previous unsigned field before current index
+        let startIdx = Math.min(DM._signFieldIdx - 1, allMyFields.length - 1);
+        let found = false;
+        for (let i = startIdx; i >= 0; i--) {
+            if (!allMyFields[i].signedValue) {
+                DM._signFieldIdx = i;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return;
     }
 
-    const targetField = fillableFields[DM._signFieldIdx];
+    const targetField = allMyFields[DM._signFieldIdx];
     if (targetField) {
         highlightNextFieldById(targetField.id);
     }
@@ -2939,7 +2865,10 @@ function signField(docId, fieldId) {
         fieldEl.innerHTML = `<input type="${inputType}" class="sign-inline-input" placeholder="${field.label || 'הזן ערך...'}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:700;text-align:center;outline:none;padding:0 6px;color:#1e293b;direction:rtl;">`;
         const inp = fieldEl.querySelector('input');
         inp.focus();
+        let committed = false;
         const commitValue = () => {
+            if (committed) return;
+            committed = true;
             const val = inp.value.trim();
             if (val) {
                 field.signedValue = val;
@@ -2951,7 +2880,7 @@ function signField(docId, fieldId) {
         };
         inp.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); commitValue(); }
-            if (e.key === 'Escape') render();
+            if (e.key === 'Escape') { committed = true; render(); }
         });
         inp.addEventListener('blur', commitValue);
         return; // don't call highlightNextField yet - wait for commit
@@ -3641,7 +3570,7 @@ function openShareModal(docId) {
 
             <div style="margin-bottom:20px;">
                 <div style="color:var(--text-light);font-size:0.9em;margin-bottom:8px;">שם המסמך:</div>
-                <div style="font-weight:600;margin-bottom:15px;">${doc.fileName || 'מסמך ללא שם'}</div>
+                <div style="font-weight:600;margin-bottom:15px;">${esc(doc.fileName || 'מסמך ללא שם')}</div>
 
                 <div style="color:var(--text-light);font-size:0.9em;margin-bottom:8px;">קישור ציבורי לצפייה וחתימה:</div>
                 <div style="display:flex;gap:8px;align-items:center;">
@@ -3894,8 +3823,8 @@ function openSharedDocument(linkId) {
     }
 
     // Load from Firebase
-    if (window.db) {
-        window.db.collection('shared_documents').doc(linkId).get()
+    if (typeof smoovDb !== 'undefined' && smoovDb) {
+        smoovDb.collection('shared_documents').doc(linkId).get()
             .then(doc => {
                 if (doc.exists) {
                     const sharedDoc = doc.data();
@@ -4018,13 +3947,16 @@ function verifySharePassword(linkId) {
             errorDiv.textContent = 'סיסמה שגויה';
             errorDiv.style.display = 'block';
         }
+    } else {
+        errorDiv.textContent = 'שגיאה בטעינת המסמך, נסה לרענן את הדף';
+        errorDiv.style.display = 'block';
     }
 }
 
 function incrementViewCount(linkId) {
-    if (!window.db) return;
+    if (typeof smoovDb === 'undefined' || !smoovDb) return;
 
-    window.db.collection('shared_documents').doc(linkId).update({
+    smoovDb.collection('shared_documents').doc(linkId).update({
         'settings.viewCount': firebase.firestore.FieldValue.increment(1)
     }).catch(error => {
         console.error('Error updating view count:', error);
@@ -4085,7 +4017,7 @@ function renderSharedDocumentView(el) {
                 </div>
 
                 <div class="shared-doc-info">
-                    <h1>${doc.fileName || 'מסמך משותף'}</h1>
+                    <h1>${esc(doc.fileName || 'מסמך משותף')}</h1>
                     <div class="shared-meta">
                         ${settings.viewCount ? `נצפה ${settings.viewCount} פעמים` : ''}
                         ${settings.maxViews ? `• מתוך ${settings.maxViews} מקסימום` : ''}
@@ -4157,8 +4089,8 @@ function renderSharedFields(fields) {
             position: absolute;
             left: ${field.x}px;
             top: ${field.y}px;
-            width: ${field.width}px;
-            height: ${field.height}px;
+            width: ${field.w || field.width || 120}px;
+            height: ${field.h || field.height || 30}px;
             border: 2px solid #2563eb;
             background: rgba(37, 99, 235, 0.1);
             border-radius: 4px;
@@ -4179,29 +4111,36 @@ function downloadSharedPDF() {
     if (!DM.sharedDoc) return;
 
     const doc = DM.sharedDoc.docData;
-    const filename = (doc.fileName || 'shared-document') + '.pdf';
-
-    // Use existing PDF generation logic
-    if (doc.docPages && doc.docPages.length > 1) {
-        generateMultiPagePDF(doc.docPages, doc.fields || [], filename);
-    } else {
-        const image = doc.docImage || doc.docPages[0];
-        generateSinglePagePDF(image, doc.fields || [], filename);
-    }
-
-    toast('מוריד PDF...', 'success');
+    // Build a temporary doc object compatible with _downloadPdfCanvasFallback
+    const tmpDoc = {
+        id: 'shared_' + Date.now(),
+        fileName: doc.fileName || 'shared-document',
+        docImage: doc.docImage,
+        docPages: doc.docPages || [],
+        pageHeights: doc.pageHeights || [],
+        pageWidth: doc.pageWidth || 0,
+        fields: doc.fields || [],
+        recipients: doc.recipients || [],
+        status: 'completed'
+    };
+    toast('מכין PDF להורדה...', 'info');
+    _downloadPdfCanvasFallback(tmpDoc).then(() => {
+        toast('ה-PDF הורד בהצלחה!');
+    }).catch(() => {
+        toast('שגיאה בהורדת הקובץ', 'error');
+    });
 }
 
 // ==================== AUTH STATE ====================
 function onAuthStateChanged(user) {
     const loginScreen = document.getElementById('loginScreen');
-    const topbar = document.querySelector('.topbar');
+    const topbar = document.getElementById('appTopbar');
     const appLayout = document.getElementById('appLayout');
     const userMenu = document.getElementById('userMenu');
 
-    // Signing links should work without auth
+    // Signing/fill links should work without auth
     const hash = window.location.hash;
-    const isSignLink = hash.startsWith('#sign/');
+    const isSignLink = hash.startsWith('#sign/') || hash.startsWith('#fill/');
 
     if (user) {
         // User is logged in
@@ -4237,9 +4176,11 @@ function onAuthStateChanged(user) {
         const avatar = document.getElementById('userAvatar');
         const userName = document.getElementById('userName');
         const userEmail = document.getElementById('userEmail');
+        const userNameTopbar = document.getElementById('userNameTopbar');
         avatar.src = user.photoURL || 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%232563eb"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/></svg>');
         userName.textContent = user.displayName || 'משתמש';
         userEmail.textContent = user.email || '';
+        if (userNameTopbar) userNameTopbar.textContent = user.displayName || user.email || '';
 
         // Restore images from IndexedDB before first render
         restoreImagesFromIDB().then(() => {
@@ -4276,7 +4217,7 @@ function onAuthStateChanged(user) {
 }
 
 // Init: hide app until auth resolves
-document.querySelector('.topbar').style.display = 'none';
+document.getElementById('appTopbar').style.display = 'none';
 document.getElementById('appLayout').style.display = 'none';
 
 // For sign/share links: show content immediately without waiting for auth
