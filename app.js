@@ -731,6 +731,7 @@ function useTemplate(id) {
     }));
     DM.isTemplate = false;
     DM._fromTemplate = true;
+    DM._templateId = id;
     DM.step = 2; // skip upload, go to recipients
     DM.view = 'create';
     render();
@@ -783,6 +784,7 @@ function resetEditor() {
     DM.recipientSearch = '';
     DM._allowNoRecipients = false;
     DM._fromTemplate = false;
+    DM._templateId = null;
 }
 
 // ==================== WIZARD ====================
@@ -1922,6 +1924,8 @@ function createLinkOnly() {
             createdAt: now,
             createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
             ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
+            _fromTemplate: !!DM._fromTemplate,
+            templateId: DM._templateId || null,
             audit: [{ action: 'created', time: now, detail: 'המסמך נוצר (קישור ללא שליחה)' }]
         };
         DM.docs.push(doc);
@@ -1939,6 +1943,8 @@ function createLinkOnly() {
 
 function showLinkSuccess(doc) {
     const baseUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+    const hasTpl = !!(doc.templateId || doc._fromTemplate);
+    const fillUrl = doc.templateId ? `${location.origin}${location.pathname}#fill/${doc.templateId}` : '';
     const main = document.getElementById('mainContent');
     main.innerHTML = `<div class="link-success-screen">
         <button class="close-btn" onclick="resetEditor();DM.view='home';render();" style="position:absolute;top:16px;left:16px;background:none;border:none;font-size:1.5em;cursor:pointer;color:var(--text-light);">✕</button>
@@ -1947,7 +1953,18 @@ function showLinkSuccess(doc) {
         </div>
         <h2 style="font-size:1.5em;font-weight:800;margin:16px 0 6px;">המסמך מוכן לחתימה!</h2>
         <p style="color:var(--text-light);font-size:0.9em;margin-bottom:24px;">עדכון ישלח אליך כאשר המסמך יחתם</p>
-        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">${(doc.recipients || []).length > 0 ? 'נתיב מסמך:' : 'קישור לחתימה:'}</div>
+        ${hasTpl && fillUrl ? `
+        <div style="width:100%;max-width:500px;margin-bottom:24px;padding:20px;background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid #93c5fd;border-radius:14px;text-align:center;">
+            <div style="font-size:0.95em;font-weight:700;color:var(--primary);margin-bottom:8px;">🔗 קישור למילוי חוזר (תבנית)</div>
+            <p style="font-size:0.82em;color:var(--text-light);margin-bottom:14px;">שתף קישור זה — כל מי שיפתח אותו יקבל <strong>עותק נפרד</strong> למילוי</p>
+            <button class="btn btn-primary" onclick="copySignLink(this,'${fillUrl}')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                העתק קישור תבנית
+            </button>
+            <div style="margin-top:10px;font-size:0.75em;color:var(--text-light);direction:ltr;word-break:break-all;">${fillUrl}</div>
+        </div>
+        ` : ''}
+        <div style="font-size:0.88em;color:var(--text-light);margin-bottom:16px;">${hasTpl ? 'קישור למסמך זה בלבד (נמענים ספציפיים):' : (doc.recipients || []).length > 0 ? 'נתיב מסמך:' : 'קישור לחתימה:'}</div>
         <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px;">
             ${(doc.recipients || []).length > 0 ? doc.recipients.map((r, i) => {
                 const signUrl = baseUrl;
@@ -1968,7 +1985,7 @@ function showLinkSuccess(doc) {
                 </button>
             </div>`}
         </div>
-        ${!doc._fromTemplate ? `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
+        ${!hasTpl ? `<div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);width:100%;max-width:500px;text-align:center;">
             <h3 style="font-weight:700;margin-bottom:6px;">צור תבנית</h3>
             <p style="font-size:0.82em;color:var(--text-light);margin-bottom:12px;">שלחת מסמך שאינו תבנית. חסוך זמן בפעם הבאה על ידי יצירת תבנית ממנו.</p>
             <button class="btn btn-outline" onclick="saveAsTemplateFromDoc('${doc.id}')">שמור כתבנית</button>
@@ -2046,6 +2063,7 @@ function sendDocument() {
             ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
             expiresAt: expiryInput && expiryInput.value ? new Date(expiryInput.value).toISOString() : null,
             _fromTemplate: !!DM._fromTemplate,
+            templateId: DM._templateId || null,
             audit: [{ action: 'created', time: now, detail: 'המסמך נוצר' }, { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.length} נמענים` }]
         };
         DM.docs.push(doc);
