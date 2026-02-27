@@ -3777,22 +3777,28 @@ let _fillingTemplate = false;
 async function loadAndCloneTemplate(tplId) {
     if (_fillingTemplate) return;
     _fillingTemplate = true;
+    console.log('[fill] Loading template:', tplId);
     try {
         const main = document.getElementById('mainContent');
         main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען תבנית...</div></div>';
 
         // Try local first (owner testing their own link)
         let tpl = DM.templates.find(t => t.id === tplId);
+        console.log('[fill] Local template:', tpl ? 'found' : 'not found', tpl ? { hasImage: !!tpl.docImage, fields: (tpl.fields||[]).length } : '');
 
         // If local template has no images, try loading from Firebase chunks
         if (tpl && !tpl.docImage && typeof _loadImageChunks === 'function') {
+            console.log('[fill] Loading images from chunks...');
             const imgs = await _loadImageChunks(tplId);
             if (imgs) { tpl.docImage = imgs.docImage; tpl.docPages = imgs.docPages || []; }
+            console.log('[fill] Chunks loaded:', !!imgs);
         }
 
         // If not found locally, load from Firebase
         if (!tpl && typeof firebaseLoadTemplate === 'function') {
+            console.log('[fill] Loading from Firebase...');
             tpl = await firebaseLoadTemplate(tplId);
+            console.log('[fill] Firebase result:', tpl ? 'found' : 'not found');
         }
 
         if (!tpl) {
@@ -3838,11 +3844,14 @@ async function loadAndCloneTemplate(tplId) {
         DM._currentSigner = signerName || signerEmail || 'חותם';
         DM._currentSignerEmail = signerEmail;
 
+        console.log('[fill] New doc created:', docId, { hasImage: !!newDoc.docImage, fields: newDoc.fields.length, signer: DM._currentSigner });
         DM.docs.push(newDoc);
         save();
         if (typeof firebaseSaveDoc === 'function') firebaseSaveDoc(newDoc);
 
         // Update hash to the new doc (prevents re-cloning on refresh)
+        // Set flag to prevent duplicate openSign from hashchange
+        window._skipNextHashSign = docId;
         location.hash = '#sign/' + docId;
         openSign(docId);
     } catch (err) {
@@ -3873,6 +3882,11 @@ function checkUrlHash() {
 
     if (hash.startsWith('#sign/')) {
         const docId = hash.substring(6);
+        // Skip if loadAndCloneTemplate just set this hash (prevents double openSign)
+        if (window._skipNextHashSign === docId) {
+            window._skipNextHashSign = null;
+            return true;
+        }
         const doc = DM.docs.find(d => d.id === docId);
         if (doc) {
             openSign(docId);
