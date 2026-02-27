@@ -1845,7 +1845,7 @@ function renderSend(el) {
             <div class="send-card">
                 <div class="form-group">
                     <label class="form-label">שם המסמך</label>
-                    <input type="text" class="form-input" value="${DM.fileName || 'מסמך ללא שם'}" onchange="DM.fileName=this.value" style="font-weight:600;">
+                    <input type="text" class="form-input" value="${esc(DM.fileName || 'מסמך ללא שם')}" onchange="DM.fileName=this.value" style="font-weight:600;">
                 </div>
                 <div class="form-group">
                     <label class="form-label">הודעה לחותם בשליחת דוא"ל</label>
@@ -1854,7 +1854,7 @@ function renderSend(el) {
                 ${DM._showInstructions ? `
                 <div class="form-group">
                     <label class="form-label">הנחיות למילוי</label>
-                    <textarea class="form-input" rows="2" placeholder="הזן הנחיות למילוי המסמך..." id="sendInstructions" style="resize:none;" onchange="DM._sendInstructions=this.value">${DM._sendInstructions}</textarea>
+                    <textarea class="form-input" rows="2" placeholder="הזן הנחיות למילוי המסמך..." id="sendInstructions" style="resize:none;" onchange="DM._sendInstructions=this.value">${esc(DM._sendInstructions)}</textarea>
                 </div>` : `
                 <div style="text-align:left;">
                     <button class="btn-link" onclick="DM._showInstructions=true;render();" style="font-size:0.82em;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;font-family:var(--font);">+ הוסף הנחיות למילוי</button>
