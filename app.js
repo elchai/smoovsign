@@ -159,11 +159,29 @@ async function restoreImagesFromIDB() {
     }
 }
 
+function smoovConfirm(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `<div class="modal-card" style="max-width:380px;text-align:center;">
+            <p style="font-weight:600;font-size:1em;margin-bottom:20px;">${esc(message)}</p>
+            <div style="display:flex;gap:8px;justify-content:center;">
+                <button class="btn btn-outline" id="_confirmNo">ביטול</button>
+                <button class="btn btn-danger" id="_confirmYes">אישור</button>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#_confirmYes').onclick = () => { overlay.remove(); resolve(true); };
+        overlay.querySelector('#_confirmNo').onclick = () => { overlay.remove(); resolve(false); };
+    });
+}
+
 function toast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.className = `toast ${type}`;
-    setTimeout(() => el.className = 'toast hidden', 3000);
+    const duration = type === 'error' ? 5000 : 3000;
+    setTimeout(() => el.className = 'toast hidden', duration);
 }
 
 // ==================== NAVIGATION ====================
@@ -314,13 +332,14 @@ function renderHome(el) {
     const allDocs = DM.docs.filter(d => !d._deleted).slice().reverse();
     const completed = allDocs.filter(d => d.status === 'completed').length;
     const inProcess = allDocs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date())).length;
-    const waiting = allDocs.filter(d => d.status !== 'completed' && d._isWaiting).length;
+    const myEmail = (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '';
+    const waiting = myEmail ? allDocs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()) && (d.recipients || []).some(r => r.email === myEmail && !r.signed)).length : 0;
     const recentDocs = allDocs.slice(0, 10);
 
     el.innerHTML = `<div class="dashboard">
         <div class="dashboard-stats">
             <div class="stat-card" style="border-top:3px solid #f472b6;" onclick="switchView('docs_waiting')">
-                <div class="stat-num">${inProcess}</div><div class="stat-label">ממתין לחתימה שלי</div>
+                <div class="stat-num">${waiting}</div><div class="stat-label">ממתין לחתימה שלי</div>
             </div>
             <div class="stat-card" style="border-top:3px solid var(--success);" onclick="switchView('docs_all')">
                 <div class="stat-num" style="color:var(--success)">${completed}</div><div class="stat-label">נחתמו לאחרונה</div>
@@ -358,6 +377,7 @@ function renderHome(el) {
                 <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--border)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 <h2>אין מסמכים עדיין</h2>
                 <p>צור מסמך חדש או השתמש בתבנית קיימת</p>
+                <button class="btn btn-primary" onclick="newDocument()" style="margin-top:12px;">העלאת מסמך חדש</button>
             </div>
         ` : `<div class="doc-table-wrap">${renderDocRows(recentDocs)}</div>`}
     </div>`;
@@ -468,12 +488,13 @@ function renderDocRows(docs, mode) {
     }).join('');
 }
 
-function deleteDoc(id) {
-    if (!confirm('למחוק מסמך זה?')) return;
+async function deleteDoc(id) {
+    if (!await smoovConfirm('למחוק מסמך זה?')) return;
     const doc = DM.docs.find(d => d.id === id);
     if (doc) { doc._deleted = true; doc._deletedAt = new Date().toISOString(); }
     save();
     render();
+    toast('המסמך הועבר לסל המחזור');
 }
 
 function restoreDoc(id) {
@@ -574,6 +595,7 @@ function saveContact(editId) {
     const email = document.getElementById('ctEmail').value.trim();
     const phone = document.getElementById('ctPhone').value.trim();
     if (!name) { toast('יש להזין שם', 'error'); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('כתובת דוא"ל לא תקינה', 'error'); return; }
     if (!DM.contacts) DM.contacts = [];
     if (editId) {
         const c = DM.contacts.find(x => x.id === editId);
@@ -586,11 +608,12 @@ function saveContact(editId) {
     render();
 }
 
-function deleteContact(id) {
-    if (!confirm('למחוק איש קשר זה?')) return;
+async function deleteContact(id) {
+    if (!await smoovConfirm('למחוק איש קשר זה?')) return;
     DM.contacts = (DM.contacts || []).filter(c => c.id !== id);
     localStorage.setItem('smoov_contacts', JSON.stringify(DM.contacts));
     render();
+    toast('איש הקשר נמחק');
 }
 
 // ==================== SHARE FUNCTIONALITY ====================
@@ -656,10 +679,10 @@ function toggleAllTemplates(checked) {
     render();
 }
 
-function deleteSelectedTemplates() {
+async function deleteSelectedTemplates() {
     const ids = Object.keys(DM._tplSelected).filter(id => DM._tplSelected[id]);
     if (ids.length === 0) return;
-    if (!confirm('למחוק ' + ids.length + ' תבניות?')) return;
+    if (!await smoovConfirm('למחוק ' + ids.length + ' תבניות?')) return;
     ids.forEach(id => {
         if (typeof firebaseDeleteTemplate === 'function') firebaseDeleteTemplate(id);
     });
@@ -669,8 +692,8 @@ function deleteSelectedTemplates() {
     render();
 }
 
-function deleteTemplate(id) {
-    if (!confirm('למחוק תבנית זו?')) return;
+async function deleteTemplate(id) {
+    if (!await smoovConfirm('למחוק תבנית זו?')) return;
     DM.templates = DM.templates.filter(t => t.id !== id);
     save();
     if (typeof firebaseDeleteTemplate === 'function') firebaseDeleteTemplate(id);
@@ -1169,7 +1192,7 @@ function scrollToPage(pageNum) {
     area.scrollTo({ top: offsets[idx] * zoom + 16, behavior: 'smooth' });
     DM._activePage = pageNum;
     // Update thumbnail highlights without full re-render
-    document.querySelectorAll('.page-thumb').forEach((thumb, i) => {
+    document.querySelectorAll('.panel-page-thumb').forEach((thumb, i) => {
         thumb.classList.toggle('active', i === idx);
         const badge = thumb.querySelector('.page-badge');
         if (i === idx && !badge) {
@@ -1193,7 +1216,7 @@ function updateActivePage() {
     }
     if (DM._activePage !== activePage) {
         DM._activePage = activePage;
-        document.querySelectorAll('.page-thumb').forEach((thumb, i) => {
+        document.querySelectorAll('.panel-page-thumb').forEach((thumb, i) => {
             thumb.classList.toggle('active', i === activePage - 1);
             const badge = thumb.querySelector('.page-badge');
             if (i === activePage - 1 && !badge) {
@@ -1203,7 +1226,7 @@ function updateActivePage() {
             }
         });
         // Scroll thumbnail into view in the sidebar
-        const activeThumb = document.querySelectorAll('.page-thumb')[activePage - 1];
+        const activeThumb = document.querySelectorAll('.panel-page-thumb')[activePage - 1];
         if (activeThumb) activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
@@ -1977,11 +2000,16 @@ function saveAsTemplateFromDoc(docId) {
 }
 
 // ==================== SEND DOCUMENT ====================
+let _sendingDoc = false;
 function sendDocument() {
+    if (_sendingDoc) return;
     if (DM.recipients.length === 0) { toast('יש להוסיף לפחות נמען אחד', 'error'); return; }
     const emptyNames = DM.recipients.filter(r => !r.name || !r.name.trim());
     if (emptyNames.length > 0) { toast('יש להזין שם לכל הנמענים', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    _sendingDoc = true;
+    const sendBtn = document.querySelector('.btn-success.btn-lg');
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'שולח...'; }
     const now = new Date().toISOString();
     const expiryInput = document.getElementById('docExpiry');
     const doc = {
@@ -2024,6 +2052,7 @@ function sendDocument() {
         }
     });
 
+    _sendingDoc = false;
     toast('המסמך נשלח בהצלחה!');
     resetEditor();
     showLinkSuccess(doc);
@@ -2446,7 +2475,7 @@ function scaleSignDoc() {
         container.style.width = docW + 'px';
         container.style.transform = `scale(${scale})`;
         container.style.transformOrigin = 'top center';
-        container.style.marginBottom = `-${docW * (1 - scale) * (container.scrollHeight / docW)}px`;
+        container.style.marginBottom = `-${container.scrollHeight * (1 - scale)}px`;
     } else {
         container.style.transform = '';
         container.style.width = '';

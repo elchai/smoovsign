@@ -589,7 +589,7 @@ select.form-input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns
 }
 .modal-card {
     background: var(--card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-    width: 520px; max-width: 95vw; padding: 24px;
+    width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; padding: 24px;
     animation: modalSlideIn 0.3s ease;
     transform: translateY(0);
 }
@@ -936,7 +936,7 @@ input[type="range"]::-moz-range-thumb {
 
     /* --- Modals --- */
     .modal-card { width: 95vw; max-width: 95vw; padding: 16px; }
-    .sign-canvas { height: 130px; }
+    .sign-canvas { height: 160px; }
     .sign-tab { padding: 8px 6px; font-size: 0.8em; }
     .sign-font-btn { padding: 6px 10px; font-size: 0.95em; }
 
@@ -998,7 +998,7 @@ input[type="range"]::-moz-range-thumb {
     .step-dot { width: 22px; height: 22px; font-size: 0.6em; }
     .step-label { font-size: 0.58em; }
     .modal-card { padding: 12px; }
-    .sign-canvas { height: 110px; }
+    .sign-canvas { height: 140px; }
     .doc-table-row { padding: 10px 12px; }
     .upload-dropzone { height: 120px; }
     .sign-header .btn-lg { padding: 8px 14px; font-size: 0.82em; }
