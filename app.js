@@ -358,7 +358,7 @@ function renderHome(el) {
                 ${DM.templates.slice(0, 4).map(t => `
                     <div class="template-quick-card" onclick="useTemplate('${t.id}')">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        <span style="font-size:0.82em;font-weight:600;margin-top:6px;">${t.name || 'תבנית'}</span>
+                        <span style="font-size:0.82em;font-weight:600;margin-top:6px;">${esc(t.name || 'תבנית')}</span>
                     </div>
                 `).join('')}
                 <div class="template-quick-card" onclick="newDocument()" style="border:2px dashed var(--border);">
@@ -571,15 +571,15 @@ function openContactModal(contact) {
         </div>
         <div class="form-group">
             <label class="form-label">שם</label>
-            <input type="text" class="form-input" id="ctName" value="${isEdit ? contact.name || '' : ''}" placeholder="שם מלא">
+            <input type="text" class="form-input" id="ctName" value="${isEdit ? esc(contact.name || '') : ''}" placeholder="שם מלא">
         </div>
         <div class="form-group">
             <label class="form-label">דוא"ל</label>
-            <input type="email" class="form-input" id="ctEmail" value="${isEdit ? contact.email || '' : ''}" placeholder="email@example.com" dir="ltr">
+            <input type="email" class="form-input" id="ctEmail" value="${isEdit ? esc(contact.email || '') : ''}" placeholder="email@example.com" dir="ltr">
         </div>
         <div class="form-group">
             <label class="form-label">נייד</label>
-            <input type="tel" class="form-input" id="ctPhone" value="${isEdit ? contact.phone || '' : ''}" placeholder="050-0000000" dir="ltr">
+            <input type="tel" class="form-input" id="ctPhone" value="${isEdit ? esc(contact.phone || '') : ''}" placeholder="050-0000000" dir="ltr">
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
             <button class="btn btn-outline" onclick="document.getElementById('contactModal').remove()">ביטול</button>
@@ -652,7 +652,7 @@ function renderTemplates(el) {
                 <input type="checkbox" ${DM._tplSelected[t.id] ? 'checked' : ''} onchange="toggleTemplateSelect('${t.id}', this.checked)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;">
                 <div class="template-icon" style="background:var(--primary-light);color:var(--primary);">${ICO.doc}</div>
                 <div class="doc-info">
-                    <h3>${t.name || 'תבנית ללא שם'}</h3>
+                    <h3>${esc(t.name || 'תבנית ללא שם')}</h3>
                     <div class="doc-meta">${t.fields ? t.fields.length + ' שדות' : ''} · ${t.fixedFields ? t.fixedFields.filter(f => f.value).length + ' שדות מוכנים' : ''}</div>
                 </div>
                 <div class="doc-actions">
@@ -991,7 +991,7 @@ async function processFile(file) {
     }
 }
 
-function clearDoc() { DM.docImage = null; DM.fileName = ''; DM.fields = []; render(); }
+function clearDoc() { DM.docImage = null; DM.docPages = []; DM.pageHeights = []; DM.pageWidth = 0; DM.fileName = ''; DM.fields = []; render(); }
 
 // ==================== STEP 2: RECIPIENTS ====================
 function renderRecipients(el) {
@@ -2387,7 +2387,7 @@ function renderSignView(el) {
                     <div class="audit-item">
                         <span class="audit-icon">${a.action === 'created' ? ICO.doc : a.action === 'sent' ? ICO.send : a.action === 'viewed' ? ICO.eye : a.action === 'signed' || a.action === 'field_signed' ? ICO.pen : a.action === 'completed' ? ICO.check : a.action === 'reminder' ? ICO.bell : '•'}</span>
                         <div style="flex:1;">
-                            <div style="font-size:0.85em;font-weight:600;">${a.detail}</div>
+                            <div style="font-size:0.85em;font-weight:600;">${esc(a.detail)}</div>
                             <div style="font-size:0.72em;color:var(--text-light);">${new Date(a.time).toLocaleString('he-IL')}</div>
                         </div>
                     </div>
@@ -3461,7 +3461,7 @@ function previewFileAttachment(input) {
             const preview = document.getElementById('filePreviewArea');
             if (preview) {
                 preview.style.display = 'block';
-                preview.innerHTML = `<div style="padding:16px;background:var(--bg);border-radius:8px;font-size:0.88em;font-weight:600;">${file.name}</div>`;
+                preview.innerHTML = `<div style="padding:16px;background:var(--bg);border-radius:8px;font-size:0.88em;font-weight:600;">${esc(file.name)}</div>`;
             }
             const btn = document.getElementById('confirmFileBtn');
             if (btn) btn.disabled = false;
@@ -3547,7 +3547,7 @@ function completeSign(docId) {
         signerRecipient.signed = true;
         signerRecipient.signedAt = new Date().toISOString();
         addAudit(doc, 'signed', `${DM._currentSigner} חתם/ה על המסמך`);
-        const allSigned = (doc.recipients || []).every(r => r.signed);
+        const allSigned = doc.recipients.length > 0 && doc.recipients.every(r => r.signed);
         if (allSigned) {
             doc.status = 'completed';
             doc.completedAt = new Date().toISOString();
@@ -4103,8 +4103,8 @@ function renderSharedDocumentView(el) {
                     <div class="shared-fields-list">
                         ${doc.fields.map(field => `
                             <div class="shared-field-item">
-                                <strong>${field.label || field.type}:</strong>
-                                <span>${field.value || '(ריק)'}</span>
+                                <strong>${esc(field.label || field.type)}:</strong>
+                                <span>${esc(field.value || '(ריק)')}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -4164,7 +4164,7 @@ function renderSharedFields(fields) {
             pointer-events: none;
         `;
 
-        return `<div style="${style}" title="${field.label || field.type}: ${field.value || '(ריק)'}">${field.value || field.type}</div>`;
+        return `<div style="${style}" title="${esc((field.label || field.type) + ': ' + (field.value || '(ריק)'))}">${esc(field.value || field.type)}</div>`;
     }).join('');
 }
 
