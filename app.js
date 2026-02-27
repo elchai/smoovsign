@@ -2677,6 +2677,7 @@ async function downloadSignedPDF(docId) {
     if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
     toast('מכין PDF להורדה...', 'info');
 
+    let container = null;
     try {
         const EDITOR_W = 800; // fields positioned on 800px-wide editor
         const hasMultiPage = doc.docPages && doc.docPages.length > 1;
@@ -2684,7 +2685,7 @@ async function downloadSignedPDF(docId) {
         const pageHeights = doc.pageHeights || [];
 
         // Build a hidden DOM container that reproduces the signed document
-        const container = document.createElement('div');
+        container = document.createElement('div');
         container.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;background:#fff;direction:rtl;font-family:Heebo,sans-serif;';
 
         let yAccum = 0;
@@ -3344,7 +3345,7 @@ function confirmSignCanvas(docId, fieldId) {
 function openDatePicker(docId, fieldId) {
     const doc = DM.docs.find(d => d.id === docId);
     const field = doc ? (doc.fields || []).find(f => f.id === fieldId) : null;
-    const hint = field && field.value ? field.value : '';
+    const hint = field && field.value ? esc(field.value) : '';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'dateModal';
@@ -3389,7 +3390,7 @@ function confirmDatePicker(docId, fieldId) {
 function openFilePicker(docId, fieldId) {
     const doc = DM.docs.find(d => d.id === docId);
     const field = doc ? (doc.fields || []).find(f => f.id === fieldId) : null;
-    const hint = field && field.value ? field.value : 'צלם או בחר קובץ תמונה';
+    const hint = field && field.value ? esc(field.value) : 'צלם או בחר קובץ תמונה';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'fileModal';
@@ -3963,7 +3964,7 @@ function renderPasswordPrompt(sharedDoc) {
                 </div>
 
                 <h2>מסמך מוגן בסיסמה</h2>
-                <p>המסמך "${sharedDoc.docData.fileName}" מוגן בסיסמה</p>
+                <p>המסמך "${esc(sharedDoc.docData.fileName)}" מוגן בסיסמה</p>
 
                 <div class="form-group">
                     <input type="password" class="form-input" id="sharePassword" placeholder="הזן סיסמה..." style="text-align: center;" onkeypress="if(event.key==='Enter') verifySharePassword('${sharedDoc.linkId}')">
