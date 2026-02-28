@@ -2213,12 +2213,13 @@ async function openSign(docId, opts = {}) {
 
     const isSignLink = location.hash.startsWith('#sign/');
     const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
+    console.log('[openSign]', { docId, opts, isSignLink, isLoggedIn, hasImage: !!doc.docImage, signer: DM._currentSigner });
 
     // If user is logged in - check if they're the owner or a signer
     if (isLoggedIn) {
         const isOwner = (doc.ownerUid && doc.ownerUid === smoovCurrentUser.uid) || (!doc.ownerUid && doc.createdBy && doc.createdBy === smoovCurrentUser.email);
-        if (isOwner) {
-            // Owner view - full access
+        if (isOwner && !opts.keepSigner) {
+            // Owner view - full access (but not when coming from fill link)
             DM._currentSigner = null;
             DM.view = 'sign';
             render();
@@ -2321,8 +2322,10 @@ function verifySigner(docId) {
 if (DM._signFieldIdx == null) DM._signFieldIdx = -1;
 
 function renderSignView(el) {
+  try {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
     if (!doc) { switchView('home'); return; }
+    console.log('[sign] Rendering sign view:', { docId: doc.id, signer: DM._currentSigner, fields: (doc.fields||[]).length, hasImage: !!doc.docImage });
 
     const isSignerView = !!DM._currentSigner;
     let signerRecipient = null;
@@ -2502,6 +2505,7 @@ function renderSignView(el) {
             </div>
         </div>
     </div>`;
+    console.log('[sign] innerHTML set OK, auto-highlighting...');
     // Auto-highlight first unsigned field only on initial load (not after navigation)
     if (!isComplete && !isExpired && DM._signFieldIdx === -1) {
         if (isSignerView && signerRecipient) {
@@ -2511,6 +2515,10 @@ function renderSignView(el) {
             highlightNextField(doc);
         }
     }
+  } catch (err) {
+    console.error('[sign] renderSignView ERROR:', err, err.stack);
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:red;"><h2>שגיאה בהצגת המסמך</h2><p>' + String(err.message || err) + '</p></div>';
+  }
 }
 
 // Scale the sign doc container on mobile to fit fields correctly
