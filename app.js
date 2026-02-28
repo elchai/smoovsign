@@ -408,7 +408,7 @@ function renderDocTable(el, mode) {
     else {
         docs = docs.filter(d => !d._deleted); // exclude deleted from all other views
         if (mode === 'sent') docs = docs.filter(d => d.status === 'completed' || (d.recipients || []).some(r => r.signed));
-        else if (mode === 'drafts') docs = docs.filter(d => !d.sentAt && d.status !== 'completed');
+        else if (mode === 'drafts') docs = docs.filter(d => d.status !== 'sent' && d.status !== 'completed');
         else if (mode === 'waiting') docs = docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()));
     }
 
