@@ -531,7 +531,7 @@ function renderContacts(el) {
             <button class="btn btn-success" onclick="addContact()">+ הוסף איש קשר</button>
         </div>
         <div style="margin-bottom:16px;">
-            <input type="text" class="form-input" placeholder="חיפוש..." value="${search}" oninput="DM._contactSearch=this.value;render()" style="max-width:300px;padding:8px 14px;font-size:0.88em;">
+            <input type="text" class="form-input" placeholder="חיפוש..." value="${esc(search)}" oninput="DM._contactSearch=this.value;render()" style="max-width:300px;padding:8px 14px;font-size:0.88em;">
         </div>
         ${contacts.length === 0 ? `
             <div class="empty-state">
@@ -807,7 +807,7 @@ function renderWizard(el) {
         <div class="wizard-stepper">
             ${steps.map((s, i) => `
                 ${i > 0 ? `<div class="step-line ${s.id <= DM.step ? 'done' : ''}"></div>` : ''}
-                <div style="display:flex;flex-direction:column;align-items:center;" ${s.id < DM.step ? `onclick="goStep(${s.id})" style="cursor:pointer;"` : ''}>
+                <div style="display:flex;flex-direction:column;align-items:center;${s.id < DM.step ? 'cursor:pointer;' : ''}" ${s.id < DM.step ? `onclick="goStep(${s.id})"` : ''}>
                     <div class="step-dot ${s.id === DM.step ? 'active' : s.id < DM.step ? 'done' : ''}">${s.id < DM.step ? '✓' : s.id === DM.step ? '●' : s.id}</div>
                     <span class="step-label ${s.id === DM.step ? 'active' : ''}">${s.label}</span>
                 </div>
@@ -874,13 +874,13 @@ function renderUpload(el) {
                 <div class="file-preview">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        <span style="font-weight:600;">${DM.fileName}</span>
+                        <span style="font-weight:600;">${esc(DM.fileName || 'מסמך ללא שם')}</span>
                     </div>
                     <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="clearDoc()">מחק</button>
                 </div>
                 ${DM.isTemplate ? `<div class="form-group">
                     <label class="form-label">שם התבנית</label>
-                    <input type="text" class="form-input" value="${DM.fileName}" onchange="DM.fileName=this.value" placeholder="הזן שם לתבנית...">
+                    <input type="text" class="form-input" value="${esc(DM.fileName || '')}" onchange="DM.fileName=this.value" placeholder="הזן שם לתבנית...">
                 </div>` : ''}
                 <div class="doc-preview-img"><img src="${DM.docImage}" alt="preview"></div>
             ` : `
@@ -2946,7 +2946,7 @@ function signField(docId, fieldId) {
         fieldEl.style.zIndex = '100';
         fieldEl.style.borderStyle = 'solid';
         const inputType = field.type === 'number' ? 'number' : 'text';
-        fieldEl.innerHTML = `<input type="${inputType}" class="sign-inline-input" placeholder="${field.label || 'הזן ערך...'}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:700;text-align:center;outline:none;padding:0 6px;color:#1e293b;direction:rtl;">`;
+        fieldEl.innerHTML = `<input type="${inputType}" class="sign-inline-input" placeholder="${esc(field.label || 'הזן ערך...')}" style="width:100%;height:100%;border:none;background:transparent;font-family:var(--font);font-size:0.85em;font-weight:700;text-align:center;outline:none;padding:0 6px;color:#1e293b;direction:rtl;">`;
         const inp = fieldEl.querySelector('input');
         inp.focus();
         let committed = false;
