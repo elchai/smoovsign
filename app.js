@@ -2338,6 +2338,32 @@ function renderSignView(el) {
     const isComplete = doc.status === 'completed';
     const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date();
 
+    // Signer completion screen - clean dedicated page
+    if (isComplete && isSignerView) {
+        el.innerHTML = `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 50%,#f0f9ff 100%);padding:40px 20px;text-align:center;">
+            <div style="background:white;border-radius:20px;padding:40px 32px;max-width:480px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.08);">
+                <div style="width:72px;height:72px;background:#22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h2 style="font-size:1.5em;font-weight:800;color:#1e293b;margin-bottom:8px;">המסמך נחתם בהצלחה!</h2>
+                <p style="color:#64748b;font-size:0.92em;margin-bottom:6px;">${esc(doc.fileName || 'מסמך')}</p>
+                <p style="color:#94a3b8;font-size:0.82em;margin-bottom:24px;">הושלם: ${doc.completedAt ? new Date(doc.completedAt).toLocaleString('he-IL') : ''}</p>
+                <button class="btn btn-primary btn-lg" onclick="downloadSignedPDF('${doc.id}')" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;">
+                    ${ICO.download} הורד מסמך חתום
+                </button>
+                <div style="margin-top:28px;padding-top:24px;border-top:1px solid #e2e8f0;">
+                    <div style="font-size:1.05em;font-weight:700;color:#1e293b;margin-bottom:4px;">איזה כיף! נכון שזה היה פשוט?</div>
+                    <div style="font-size:0.85em;color:#64748b;margin-bottom:14px;">צרו מסמכים דיגיטליים ואספו חתימות בקלות</div>
+                    <a href="${location.origin}${location.pathname}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:white;padding:10px 24px;border-radius:10px;font-weight:700;font-size:0.88em;text-decoration:none;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+                        <svg width="18" height="18" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="rgba(255,255,255,0.25)"/><path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="3.5"/><polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/><path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
+                        פתחו חשבון SmoovSign בחינם
+                    </a>
+                </div>
+            </div>
+        </div>`;
+        return;
+    }
+
     const myFields = isSignerView && signerRecipient
         ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
         : (doc.fields || []).filter(f => !f.fixed);
