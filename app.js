@@ -2191,11 +2191,13 @@ function copyTemplateFillLink(btn, tplId) {
 }
 
 // ==================== SIGNING VIEW ====================
-async function openSign(docId) {
+async function openSign(docId, opts = {}) {
     DM.signDocId = docId;
     DM._signFieldIdx = -1; // Reset field navigation index for new document
-    DM._currentSigner = null; // Reset signer identity for new document
-    DM._currentSignerEmail = null;
+    if (!opts.keepSigner) {
+        DM._currentSigner = null; // Reset signer identity for new document
+        DM._currentSignerEmail = null;
+    }
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
 
@@ -2287,6 +2289,10 @@ async function googleSignForSigner(docId) {
         DM._currentSignerEmail = user.email || '';
         const doc = DM.docs.find(d => d.id === docId);
         if (doc) {
+            // Update signer identity on doc so onAuthStateChanged filter keeps it
+            doc.signerUid = user.uid;
+            doc.signerEmail = user.email || '';
+            doc.signerName = DM._currentSigner;
             addAudit(doc, 'verified', `${DM._currentSigner} אומת/ה עם Google`);
             save(); syncDocToFirebase(doc);
         }
@@ -3854,7 +3860,7 @@ async function loadAndCloneTemplate(tplId) {
         // Set flag to prevent duplicate openSign from hashchange
         window._skipNextHashSign = docId;
         location.hash = '#sign/' + docId;
-        openSign(docId);
+        openSign(docId, { keepSigner: true });
     } catch (err) {
         console.error('Error cloning template:', err);
         toast('שגיאה בטעינת התבנית', 'error');
@@ -4273,6 +4279,7 @@ function onAuthStateChanged(user) {
         const uid = user.uid;
         const email = user.email;
         DM.docs = DM.docs.filter(d =>
+            d.id === DM.signDocId || // Always keep the currently active doc
             !d.ownerUid || d.ownerUid === uid || d.signerUid === uid ||
             d.signerEmail === email || d.createdBy === email
         );
