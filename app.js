@@ -3105,7 +3105,7 @@ function openSignatureCanvas(docId, fieldId) {
         <!-- Actions -->
         <div style="display:flex;gap:8px;margin-top:14px;">
             <button class="btn btn-outline" style="flex:1;" onclick="cancelSignCanvas()">ביטול</button>
-            <button class="btn btn-primary" style="flex:1;" onclick="confirmSignCanvas('${docId}',${JSON.stringify(fieldId)})">אשר חתימה</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmSignCanvas('${docId}',${JSON.stringify(fieldId).replace(/"/g, '&quot;')})">אשר חתימה</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -3410,7 +3410,7 @@ function openDatePicker(docId, fieldId) {
         <input type="date" id="datePickerInput" class="form-input" style="font-size:1.1em;padding:12px;text-align:center;">
         <div style="display:flex;gap:8px;margin-top:14px;">
             <button class="btn btn-outline" style="flex:1;" onclick="closeDatePicker()">ביטול</button>
-            <button class="btn btn-primary" style="flex:1;" onclick="confirmDatePicker('${docId}',${JSON.stringify(fieldId)})">אישור</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmDatePicker('${docId}',${JSON.stringify(fieldId).replace(/"/g, '&quot;')})">אישור</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -3468,7 +3468,7 @@ function openFilePicker(docId, fieldId) {
         </div>
         <div style="display:flex;gap:8px;">
             <button class="btn btn-outline" style="flex:1;" onclick="closeFilePicker()">ביטול</button>
-            <button class="btn btn-primary" style="flex:1;" id="confirmFileBtn" disabled onclick="confirmFilePicker('${docId}',${JSON.stringify(fieldId)})">אישור</button>
+            <button class="btn btn-primary" style="flex:1;" id="confirmFileBtn" disabled onclick="confirmFilePicker('${docId}',${JSON.stringify(fieldId).replace(/"/g, '&quot;')})">אישור</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
