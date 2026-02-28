@@ -2562,8 +2562,9 @@ function toggleAuditLog() {
 
 // ==================== GUIDED FIELD NAVIGATION ====================
 function navigateSignField(docId, direction) {
+    console.log('[nav] navigateSignField called:', docId, direction);
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) return;
+    if (!doc) { console.warn('[nav] doc not found:', docId); return; }
 
     const isSignerView = !!DM._currentSigner;
     let signerRecipient = null;
@@ -2926,8 +2927,9 @@ function addAudit(doc, action, detail) {
 }
 
 function signField(docId, fieldId) {
+    console.log('[signField] called:', docId, fieldId);
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) return;
+    if (!doc) { console.warn('[signField] doc not found:', docId); return; }
     // Check expiration
     if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
         toast('תוקף המסמך פג', 'error'); return;
@@ -3563,9 +3565,10 @@ function highlightNextField(doc) {
 }
 
 function completeSign(docId) {
+  console.log('[complete] completeSign called:', docId);
   try {
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) { toast('המסמך לא נמצא', 'error'); return; }
+    if (!doc) { console.warn('[complete] doc not found:', docId); toast('המסמך לא נמצא', 'error'); return; }
     // Check expiration
     if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
         toast('תוקף המסמך פג', 'error'); return;
