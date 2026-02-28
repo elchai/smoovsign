@@ -2759,7 +2759,18 @@ function sendReminder(docId, recipientId) {
 // Download signed document as PDF (html2pdf.js - pixel-perfect DOM rendering with RTL support)
 async function downloadSignedPDF(docId) {
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc || !doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
+    if (!doc) { toast('אין מסמך להורדה', 'error'); return; }
+
+    // Ensure images are loaded (may have been stripped from memory)
+    if (!doc.docImage) {
+        const imgs = await idbLoadImages(docId);
+        if (imgs && imgs.docImage) { doc.docImage = imgs.docImage; doc.docPages = imgs.docPages || []; }
+        else if (typeof _loadImageChunks === 'function') {
+            const chunks = await _loadImageChunks(doc.templateId || docId);
+            if (chunks && chunks.docImage) { doc.docImage = chunks.docImage; doc.docPages = chunks.docPages || []; }
+        }
+    }
+    if (!doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
     toast('מכין PDF להורדה...', 'info');
 
     let container = null;
