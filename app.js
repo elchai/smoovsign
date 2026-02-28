@@ -2025,8 +2025,8 @@ function saveAsTemplateFromDoc(docId) {
         recipients: JSON.parse(JSON.stringify(doc.recipients)),
         fields: JSON.parse(JSON.stringify(doc.fields)),
         createdAt: new Date().toISOString(),
-        createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
-        ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
+        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.email) || '',
+        ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.uid) || ''
     };
     DM.templates.push(tpl);
     save();
@@ -2123,8 +2123,8 @@ async function saveTemplate() {
             fields: JSON.parse(JSON.stringify(DM.fields)),
             fixedFields: DM.fields.filter(f => f.fixed),
             createdAt: new Date().toISOString(),
-            createdBy: (smoovCurrentUser && smoovCurrentUser.email) || '',
-            ownerUid: (smoovCurrentUser && smoovCurrentUser.uid) || ''
+            createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.email) || '',
+            ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.uid) || ''
         };
 
         if (DM.editingTemplateId) {
@@ -2920,6 +2920,7 @@ function signField(docId, fieldId) {
     }
     const field = (doc.fields || []).find(f => f.id === fieldId);
     if (!field) return;
+    if (field.signedValue) return; // Already signed
 
     if (field.type === 'signature') {
         openSignatureCanvas(docId, fieldId);
@@ -4173,7 +4174,7 @@ function renderSharedDocumentView(el) {
 }
 
 function renderSharedSinglePageDocument(doc) {
-    const image = doc.docImage || doc.docPages[0];
+    const image = doc.docImage || (doc.docPages && doc.docPages[0]);
     return `
         <div class="shared-page">
             <div class="shared-page-image">
