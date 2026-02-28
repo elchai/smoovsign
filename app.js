@@ -727,7 +727,7 @@ function useTemplate(id) {
     // Copy template fields - fixed ones keep their value, dynamic ones are empty (except checkboxes with defaultChecked)
     DM.fields = (tpl.fields || []).map(f => ({
         ...f, id: Date.now() + Math.random(),
-        value: f.fixed ? f.value : (f.type === 'checkbox' && f.defaultChecked ? '✓' : '')
+        value: f.fixed ? f.value : (f.type === 'date_auto' ? new Date().toLocaleDateString('he-IL') : (f.type === 'checkbox' && f.defaultChecked ? '✓' : ''))
     }));
     DM.isTemplate = false;
     DM._fromTemplate = true;
@@ -1298,9 +1298,10 @@ function setupCanvasDrop() {
         const defaultH = type === 'signature' ? 80 : type === 'checkbox' ? 26 : 28;
         const assignee = DM.recipients.find(r => r.id === DM.activeRecipientId) || DM.recipients[0];
 
+        const autoValue = type === 'date_auto' ? new Date().toLocaleDateString('he-IL') : '';
         const f = {
             id: Date.now() + Math.random(),
-            type, label, value: '',
+            type, label, value: autoValue,
             x: Math.max(0, dropX - defaultW / 2),
             y: Math.max(0, dropY - defaultH / 2),
             w: defaultW, h: defaultH,
@@ -1448,9 +1449,11 @@ function onCanvasClick(e) {
     const defaultW = type === 'signature' ? 160 : type === 'checkbox' ? 26 : type === 'file' ? 140 : 120;
     const defaultH = type === 'signature' ? 80 : type === 'checkbox' ? 26 : 28;
 
+    // Auto-set values for certain types
+    const autoValue = type === 'date_auto' ? new Date().toLocaleDateString('he-IL') : '';
     const f = {
         id: Date.now() + Math.random(),
-        type, label, value: '',
+        type, label, value: autoValue,
         x: Math.max(0, clickX - defaultW / 2),
         y: Math.max(0, clickY - defaultH / 2),
         w: defaultW, h: defaultH,
@@ -1496,6 +1499,10 @@ function updateField(id, key, val) {
     const f = DM.fields.find(x => x.id === id);
     if (f) {
         f[key] = val;
+        // Auto-set values when type changes
+        if (key === 'type' && val === 'date_auto' && !f.value) {
+            f.value = new Date().toLocaleDateString('he-IL');
+        }
         // אם משנים את defaultChecked, מעדכנים את הערך בהתאם
         if (key === 'defaultChecked' && f.type === 'checkbox') {
             f.value = val ? '✓' : '';
@@ -3870,7 +3877,7 @@ async function loadAndCloneTemplate(tplId) {
                 signedValue: null,
                 signatureData: null,
                 fileData: null,
-                value: f.fixed ? f.value : (f.type === 'checkbox' && f.defaultChecked ? '\u2713' : '')
+                value: f.fixed ? f.value : (f.type === 'date_auto' ? new Date().toLocaleDateString('he-IL') : (f.type === 'checkbox' && f.defaultChecked ? '\u2713' : ''))
             })),
             status: 'sent',
             templateId: tplId,
