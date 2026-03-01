@@ -2698,7 +2698,7 @@ function updateSignNavButton(docId) {
     }
 
     // Update progress bar
-    const filled = myFields.filter(f => f.signedValue).length;
+    const filled = myFields.filter(f => f.signedValue || f.value).length;
     const pct = myFields.length > 0 ? Math.round((filled / myFields.length) * 100) : 0;
     const progressFill = document.querySelector('.sign-progress-fill');
     if (progressFill) progressFill.style.width = pct + '%';
@@ -2987,6 +2987,14 @@ function signField(docId, fieldId) {
     }
     const field = (doc.fields || []).find(f => f.id === fieldId);
     if (!field) return;
+    // Checkbox toggle - allow un-ticking
+    if (field.type === 'checkbox') {
+        field.signedValue = field.signedValue ? '' : '✓';
+        addAudit(doc, 'field_signed', `שדה "${field.label}" ${field.signedValue ? 'סומן' : 'בוטל'}`);
+        save(); syncDocToFirebase(doc); render();
+        highlightNextField(doc);
+        return;
+    }
     if (field.signedValue) return; // Already signed
 
     if (field.type === 'signature') {
@@ -3002,10 +3010,6 @@ function signField(docId, fieldId) {
     } else if (field.type === 'file') {
         // File attachment - open file/camera picker
         openFilePicker(docId, fieldId);
-    } else if (field.type === 'checkbox') {
-        field.signedValue = '✓';
-        addAudit(doc, 'field_signed', `שדה "${field.label}" סומן`);
-        save(); syncDocToFirebase(doc); render();
     } else {
         // Inline editing inside the field on the document
         const fieldEl = document.querySelector(`.sign-field[data-fid="${fieldId}"]`);
@@ -3034,7 +3038,7 @@ function signField(docId, fieldId) {
             if (e.key === 'Enter') { e.preventDefault(); commitValue(); }
             if (e.key === 'Escape') { committed = true; render(); }
         });
-        inp.addEventListener('blur', () => setTimeout(commitValue, 150));
+        inp.addEventListener('blur', () => { if (!committed) setTimeout(commitValue, 150); });
         return; // don't call highlightNextField yet - wait for commit
     }
     // Move to next unsigned field
@@ -3909,9 +3913,15 @@ async function loadAndCloneTemplate(tplId) {
             audit: [{ action: 'created', detail: 'נוצר מתבנית: ' + (tpl.name || '') + (signerName ? ' ע"י ' + signerName : ''), time: now }]
         };
 
-        // Set signer identity from Google account
-        DM._currentSigner = signerName || signerEmail || 'חותם';
-        DM._currentSignerEmail = signerEmail;
+        // Set signer identity from Google account (only if logged in)
+        if (smoovCurrentUser) {
+            DM._currentSigner = signerName || signerEmail || 'חותם';
+            DM._currentSignerEmail = signerEmail;
+        } else {
+            // Not logged in - let openSign trigger identity verification
+            DM._currentSigner = null;
+            DM._currentSignerEmail = null;
+        }
 
         console.log('[fill] New doc created:', docId, { hasImage: !!newDoc.docImage, fields: newDoc.fields.length, signer: DM._currentSigner });
         DM.docs.push(newDoc);
@@ -3922,7 +3932,7 @@ async function loadAndCloneTemplate(tplId) {
         // Set flag to prevent duplicate openSign from hashchange
         window._skipNextHashSign = docId;
         location.hash = '#sign/' + docId;
-        openSign(docId, { keepSigner: true });
+        openSign(docId, { keepSigner: !!smoovCurrentUser });
     } catch (err) {
         console.error('Error cloning template:', err);
         toast('שגיאה בטעינת התבנית', 'error');
