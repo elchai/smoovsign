@@ -2758,8 +2758,9 @@ function sendReminder(docId, recipientId) {
 
 // Download signed document as PDF (html2pdf.js - pixel-perfect DOM rendering with RTL support)
 async function downloadSignedPDF(docId) {
+    console.log('[PDF] downloadSignedPDF called:', docId);
     const doc = DM.docs.find(d => d.id === docId);
-    if (!doc) { toast('אין מסמך להורדה', 'error'); return; }
+    if (!doc) { console.log('[PDF] doc not found'); toast('אין מסמך להורדה', 'error'); return; }
 
     // Ensure images are loaded (may have been stripped from memory)
     if (!doc.docImage || (doc.pageHeights && doc.pageHeights.length > 1 && (!doc.docPages || doc.docPages.length < 2))) {
@@ -2770,7 +2771,8 @@ async function downloadSignedPDF(docId) {
             if (chunks && chunks.docImage) { doc.docImage = chunks.docImage; doc.docPages = chunks.docPages || []; }
         }
     }
-    if (!doc.docImage) { toast('אין מסמך להורדה', 'error'); return; }
+    if (!doc.docImage) { console.log('[PDF] no docImage after load attempt'); toast('אין מסמך להורדה', 'error'); return; }
+    console.log('[PDF] starting generation, pages:', doc.docPages ? doc.docPages.length : 0, 'pageHeights:', (doc.pageHeights || []).length, 'docImage length:', doc.docImage.length);
     toast('מכין PDF להורדה...', 'info');
 
     try {
@@ -2778,6 +2780,7 @@ async function downloadSignedPDF(docId) {
         const hasMultiPage = doc.docPages && doc.docPages.length > 1;
         const pages = hasMultiPage ? doc.docPages : [doc.docImage];
         const pageHeights = doc.pageHeights || [];
+        console.log('[PDF] hasMultiPage:', hasMultiPage, 'rendering', pages.length, 'pages');
 
         // Helper: load image and get natural dimensions
         function loadImg(src) {
@@ -2790,10 +2793,15 @@ async function downloadSignedPDF(docId) {
         }
 
         // Load all page images to get dimensions
-        const pageImgs = await Promise.all(pages.map(src => loadImg(src)));
+        const pageImgs = await Promise.all(pages.map((src, i) => {
+            console.log('[PDF] loading page', i, 'data length:', src ? src.length : 'NULL');
+            return loadImg(src);
+        }));
+        console.log('[PDF] all page images loaded, dims:', pageImgs.map(img => img.naturalWidth + 'x' + img.naturalHeight));
 
         const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if (!jsPDF) { toast('ספריית PDF לא נטענה', 'error'); return; }
+        if (!jsPDF) { console.log('[PDF] jsPDF not found'); toast('ספריית PDF לא נטענה', 'error'); return; }
+        console.log('[PDF] jsPDF available');
 
         let pdf = null;
         let yAccum = 0;
@@ -2865,12 +2873,16 @@ async function downloadSignedPDF(docId) {
         }
 
         if (pdf) {
+            console.log('[PDF] saving PDF...');
             pdf.save((doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf');
             toast('ה-PDF הורד בהצלחה!');
+        } else {
+            console.log('[PDF] pdf object is null - no pages rendered');
+            toast('שגיאה: אין עמודים ב-PDF', 'error');
         }
     } catch (err) {
-        console.error('PDF generation error:', err);
-        toast('שגיאה בהורדת הקובץ: ' + friendlyError(err), 'error');
+        console.error('[PDF] generation error:', err);
+        toast('שגיאה בהורדת הקובץ: ' + (err.message || err), 'error');
     }
 }
 
