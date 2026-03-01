@@ -2505,9 +2505,10 @@ function renderSignView(el) {
                         const isMyField = !isSignerView || !signerRecipient || f.assigneeId === signerRecipient.id;
                         const canSign = !val && !f.fixed && !isComplete && !isExpired && isMyField;
                         const showField = isMyField || val || f.fixed;
+                        console.log('[field]', f.type, f.label, { val, signedValue: f.signedValue, value: f.value, isMyField, canSign, showField, hasSignatureData: !!f.signatureData });
                         if (!showField) return '';
                         const typeLabels = { signature: 'שדה חתימה', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'תעודת זהות', text: 'שדה טקסט', number: 'מספר', file: 'קובץ', checkbox: '☐' };
-                        return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;border-radius:20px;
+                        return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;border-radius:8px;
                             ${val ? `background:${c.bg};border:1.5px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
                             ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}
                             ${f.required && canSign ? 'title="שדה חובה"' : ''}>
@@ -2817,9 +2818,22 @@ async function downloadSignedPDF(docId) {
         const pageImgs = await Promise.all(pages.map(src => _loadImg(src)));
         console.log('[PDF] images loaded:', pageImgs.map(img => img.naturalWidth + 'x' + img.naturalHeight));
 
-        // Get jsPDF constructor
-        const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if (!jsPDF) { console.error('[PDF] jsPDF not found!'); toast('ספריית PDF לא נטענה - נסה לרענן את הדף', 'error'); return; }
+        // Get jsPDF constructor (with dynamic fallback load)
+        let jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (!jsPDF) {
+            console.log('[PDF] jsPDF not found, attempting dynamic load...');
+            try {
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+                jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            } catch (e) { console.error('[PDF] dynamic jsPDF load failed:', e); }
+        }
+        if (!jsPDF) { console.error('[PDF] jsPDF not found after fallback!'); toast('ספריית PDF לא נטענה - נסה לרענן את הדף', 'error'); return; }
 
         let pdf = null;
         let yAccum = 0;
