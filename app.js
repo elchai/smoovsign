@@ -2858,15 +2858,20 @@ async function downloadSignedPDF(docId) {
             const yStart = yAccum;
             const yEnd = yStart + pgH;
 
+            console.log('[PDF] page', i, 'yRange:', yStart, '-', yEnd, 'fields:', (doc.fields || []).length);
             for (const f of (doc.fields || [])) {
                 const val = f.signedValue || f.value || '';
-                if (!val && !f.signatureData && !f.fileData) continue;
-                if (f.y + f.h < yStart || f.y >= yEnd) continue;
+                const hasData = !!(val || f.signatureData || f.fileData);
+                const inRange = !(f.y + f.h < yStart || f.y >= yEnd);
+                console.log('[PDF] field', f.type, f.label, { val: val ? val.substring(0, 20) : '', hasSignatureData: !!f.signatureData, hasFileData: !!f.fileData, y: f.y, h: f.h, inRange, hasData });
+                if (!hasData) continue;
+                if (!inRange) continue;
 
                 const fx = f.x / scale;
                 const fy = (f.y - yStart) / scale;
                 const fw = f.w / scale;
                 const fh = f.h / scale;
+                console.log('[PDF] drawing field at', { fx: Math.round(fx), fy: Math.round(fy), fw: Math.round(fw), fh: Math.round(fh) });
 
                 if (f.signatureData || f.fileData) {
                     try {
@@ -2875,7 +2880,8 @@ async function downloadSignedPDF(docId) {
                         const drawW = fImg.naturalWidth * ratio;
                         const drawH = fImg.naturalHeight * ratio;
                         ctx.drawImage(fImg, fx + (fw - drawW) / 2, fy + (fh - drawH) / 2, drawW, drawH);
-                    } catch (e) { /* skip broken image */ }
+                        console.log('[PDF] signature/file drawn OK');
+                    } catch (e) { console.error('[PDF] signature/file draw ERROR:', e.message); }
                 } else if (val) {
                     const fontSize = Math.max(12, Math.round(14 / scale));
                     ctx.font = `bold ${fontSize}px Heebo, Segoe UI, Arial, sans-serif`;
@@ -2883,6 +2889,7 @@ async function downloadSignedPDF(docId) {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw);
+                    console.log('[PDF] text drawn:', val);
                 }
             }
 
