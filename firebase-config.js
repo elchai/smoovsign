@@ -277,8 +277,10 @@ async function firebaseSaveTemplate(tpl) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
         // Save metadata to Firestore first (fast)
-        await smoovDb.collection('smoov_docs').doc(tpl.id).set(_stripImages(tpl));
-        console.log('Template metadata saved to Firebase:', tpl.id);
+        const stripped = _stripImages(tpl);
+        console.log('[tpl-save] Saving template:', tpl.id, 'fields:', (stripped.fields||[]).map(f => ({type:f.type, label:f.label})));
+        await smoovDb.collection('smoov_docs').doc(tpl.id).set(stripped);
+        console.log('[tpl-save] Template metadata saved OK:', tpl.id);
         // Save images as chunks (wait for completion so fill links work immediately)
         if (tpl.docImage || (tpl.docPages && tpl.docPages.length)) {
             const ok = await _saveImageChunks(tpl.id, tpl.docImage, tpl.docPages);
@@ -298,13 +300,14 @@ async function firebaseLoadTemplate(tplId) {
         const snap = await smoovDb.collection('smoov_docs').doc(tplId).get();
         if (!snap.exists) { console.warn('Template not found in Firebase:', tplId); return null; }
         const data = snap.data();
+        console.log('[tpl-load] Firebase data fields:', (data.fields||[]).map(f => ({type:f.type, label:f.label})));
         // Load images from chunks
         const imgs = await _loadImageChunks(tplId);
         if (imgs) {
             if (imgs.docImage) data.docImage = imgs.docImage;
             if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
         }
-        console.log('Template loaded from Firebase:', tplId);
+        console.log('[tpl-load] Template loaded from Firebase:', tplId);
         return data;
     } catch (err) {
         console.warn('Firestore load template error:', err);
