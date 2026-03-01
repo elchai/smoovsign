@@ -2803,85 +2803,92 @@ async function downloadSignedPDF(docId) {
         const pageHeights = doc.pageHeights || [];
         console.log('[PDF] pages:', pages.length, 'hasMultiPage:', hasMultiPage);
 
-        // Build on-screen container for html2pdf (briefly visible during capture)
-        const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;top:0;left:0;width:' + EDITOR_W + 'px;z-index:99999;background:#fff;font-family:Heebo,sans-serif;';
+        // Helper: load image
+        function _loadImg(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Image load failed'));
+                img.src = src;
+            });
+        }
+
+        // Load all page images
+        const pageImgs = await Promise.all(pages.map(src => _loadImg(src)));
+        console.log('[PDF] images loaded:', pageImgs.map(img => img.naturalWidth + 'x' + img.naturalHeight));
+
+        // Get jsPDF constructor
+        const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (!jsPDF) { console.error('[PDF] jsPDF not found!'); toast('ספריית PDF לא נטענה - נסה לרענן את הדף', 'error'); return; }
+
+        let pdf = null;
         let yAccum = 0;
 
-        for (let i = 0; i < pages.length; i++) {
-            const pageDiv = document.createElement('div');
-            pageDiv.style.cssText = `position:relative;width:${EDITOR_W}px;background:#fff;`;
-            if (i > 0) pageDiv.style.pageBreakBefore = 'always';
+        for (let i = 0; i < pageImgs.length; i++) {
+            const img = pageImgs[i];
+            const natW = img.naturalWidth;
+            const natH = img.naturalHeight;
+            const scale = EDITOR_W / natW;
 
-            const imgEl = document.createElement('img');
-            imgEl.src = pages[i];
-            imgEl.style.cssText = 'width:100%;display:block;';
-            pageDiv.appendChild(imgEl);
+            // Create canvas at natural image size
+            const canvas = document.createElement('canvas');
+            canvas.width = natW;
+            canvas.height = natH;
+            const ctx = canvas.getContext('2d');
 
+            // Draw page background
+            ctx.drawImage(img, 0, 0, natW, natH);
+
+            // Draw field overlays
             const pgH = pageHeights[i] || 99999;
             const yStart = yAccum;
             const yEnd = yStart + pgH;
 
-            // Overlay signed fields
-            (doc.fields || []).forEach(f => {
+            for (const f of (doc.fields || [])) {
                 const val = f.signedValue || f.value || '';
-                if (!val && !f.signatureData && !f.fileData) return;
-                if (f.y + f.h < yStart || f.y >= yEnd) return;
+                if (!val && !f.signatureData && !f.fileData) continue;
+                if (f.y + f.h < yStart || f.y >= yEnd) continue;
 
-                const fieldDiv = document.createElement('div');
-                fieldDiv.style.cssText = `position:absolute;left:${f.x}px;top:${f.y - yStart}px;width:${f.w}px;height:${f.h}px;display:flex;align-items:center;justify-content:center;overflow:hidden;`;
+                const fx = f.x / scale;
+                const fy = (f.y - yStart) / scale;
+                const fw = f.w / scale;
+                const fh = f.h / scale;
 
-                if (f.signatureData) {
-                    const sigImg = document.createElement('img');
-                    sigImg.src = f.signatureData;
-                    sigImg.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
-                    fieldDiv.appendChild(sigImg);
-                } else if (f.fileData) {
-                    const fileImg = document.createElement('img');
-                    fileImg.src = f.fileData;
-                    fileImg.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
-                    fieldDiv.appendChild(fileImg);
+                if (f.signatureData || f.fileData) {
+                    try {
+                        const fImg = await _loadImg(f.signatureData || f.fileData);
+                        const ratio = Math.min(fw / fImg.naturalWidth, fh / fImg.naturalHeight);
+                        const drawW = fImg.naturalWidth * ratio;
+                        const drawH = fImg.naturalHeight * ratio;
+                        ctx.drawImage(fImg, fx + (fw - drawW) / 2, fy + (fh - drawH) / 2, drawW, drawH);
+                    } catch (e) { /* skip broken image */ }
                 } else if (val) {
-                    fieldDiv.style.fontFamily = 'Heebo, Segoe UI, Arial, sans-serif';
-                    fieldDiv.style.fontSize = '14px';
-                    fieldDiv.style.fontWeight = 'bold';
-                    fieldDiv.style.color = '#1e293b';
-                    fieldDiv.style.textAlign = 'center';
-                    fieldDiv.textContent = val;
+                    const fontSize = Math.max(12, Math.round(14 / scale));
+                    ctx.font = `bold ${fontSize}px Heebo, Segoe UI, Arial, sans-serif`;
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw);
                 }
-                pageDiv.appendChild(fieldDiv);
-            });
+            }
 
-            container.appendChild(pageDiv);
+            // Add page to PDF (use canvas data URL)
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            console.log('[PDF] page', i, ':', natW + 'x' + natH, 'jpeg:', imgData.length, 'chars');
+
+            if (i === 0) {
+                pdf = new jsPDF({ unit: 'px', format: [natW, natH], orientation: natW > natH ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
+            } else {
+                pdf.addPage([natW, natH], natW > natH ? 'landscape' : 'portrait');
+            }
+            pdf.addImage(imgData, 'JPEG', 0, 0, natW, natH);
             yAccum += pgH;
         }
 
-        document.body.appendChild(container);
-
-        // Wait for all images to load
-        const allImgs = container.querySelectorAll('img');
-        await Promise.all([...allImgs].map(img =>
-            img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
-        ));
-        await new Promise(r => setTimeout(r, 200));
-
-        // Get first page height for PDF format
-        const firstPage = container.children[0];
-        const pageW = firstPage ? firstPage.scrollWidth : EDITOR_W;
-        const pageH = firstPage ? firstPage.scrollHeight : 1131;
-        console.log('[PDF] page size:', pageW, 'x', pageH, 'total container:', container.scrollWidth, 'x', container.scrollHeight);
-
-        await html2pdf().set({
-            margin: 0,
-            filename: (doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf',
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: pageW, height: container.scrollHeight },
-            jsPDF: { unit: 'px', format: [pageW, pageH], orientation: pageW > pageH ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] },
-            pagebreak: { mode: ['css'] }
-        }).from(container).save();
-
-        container.remove();
-        toast('ה-PDF הורד בהצלחה!');
+        if (pdf) {
+            pdf.save((doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf');
+            toast('ה-PDF הורד בהצלחה!');
+        }
     } catch (err) {
         console.error('[PDF] generation error:', err);
         toast('שגיאה בהורדת הקובץ: ' + (err.message || err), 'error');
