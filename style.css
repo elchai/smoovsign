@@ -179,8 +179,8 @@ body.fullscreen-view .wizard { height: 100vh; }
     border-radius: 0 0 var(--radius) var(--radius);
     position: sticky; bottom: 0;
 }
-.bulk-action-bar .btn-outline { color: white; border-color: rgba(255,255,255,0.5); }
-.bulk-action-bar .btn-outline:hover { background: rgba(255,255,255,0.15); }
+.bulk-action-bar .btn-outline { color: var(--primary); background: white; border-color: white; font-weight: 600; }
+.bulk-action-bar .btn-outline:hover { background: #e0e7ff; }
 .bulk-action-bar .btn-danger { background: var(--danger); border-color: var(--danger); color: white; }
 .bulk-action-bar .btn-danger:hover { opacity: 0.9; }
 .bulk-action-bar .btn-ghost { color: rgba(255,255,255,0.8); }
