@@ -2505,7 +2505,6 @@ function renderSignView(el) {
                         const isMyField = !isSignerView || !signerRecipient || f.assigneeId === signerRecipient.id;
                         const canSign = !val && !f.fixed && !isComplete && !isExpired && isMyField;
                         const showField = isMyField || val || f.fixed;
-                        console.log('[field]', f.type, f.label, { val, signedValue: f.signedValue, value: f.value, isMyField, canSign, showField, hasSignatureData: !!f.signatureData });
                         if (!showField) return '';
                         const typeLabels = { signature: 'שדה חתימה', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'תעודת זהות', text: 'שדה טקסט', number: 'מספר', file: 'קובץ', checkbox: '☐' };
                         return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;border-radius:8px;
@@ -2854,24 +2853,22 @@ async function downloadSignedPDF(docId) {
             ctx.drawImage(img, 0, 0, natW, natH);
 
             // Draw field overlays
-            const pgH = pageHeights[i] || 99999;
+            // pageHeights are in natural/image space, field coords are in editor space (width=800)
+            // Convert page height to editor space for consistent boundary checks
+            const pgH_editor = pageHeights[i] ? pageHeights[i] * scale : 99999;
             const yStart = yAccum;
-            const yEnd = yStart + pgH;
+            const yEnd = yStart + pgH_editor;
 
-            console.log('[PDF] page', i, 'yRange:', yStart, '-', yEnd, 'fields:', (doc.fields || []).length);
             for (const f of (doc.fields || [])) {
                 const val = f.signedValue || f.value || '';
-                const hasData = !!(val || f.signatureData || f.fileData);
-                const inRange = !(f.y + f.h < yStart || f.y >= yEnd);
-                console.log('[PDF] field', f.type, f.label, { val: val ? val.substring(0, 20) : '', hasSignatureData: !!f.signatureData, hasFileData: !!f.fileData, y: f.y, h: f.h, inRange, hasData });
-                if (!hasData) continue;
-                if (!inRange) continue;
+                if (!val && !f.signatureData && !f.fileData) continue;
+                if (f.y + f.h < yStart || f.y >= yEnd) continue;
 
+                // Convert from editor space to natural image space
                 const fx = f.x / scale;
                 const fy = (f.y - yStart) / scale;
                 const fw = f.w / scale;
                 const fh = f.h / scale;
-                console.log('[PDF] drawing field at', { fx: Math.round(fx), fy: Math.round(fy), fw: Math.round(fw), fh: Math.round(fh) });
 
                 if (f.signatureData || f.fileData) {
                     try {
@@ -2880,8 +2877,7 @@ async function downloadSignedPDF(docId) {
                         const drawW = fImg.naturalWidth * ratio;
                         const drawH = fImg.naturalHeight * ratio;
                         ctx.drawImage(fImg, fx + (fw - drawW) / 2, fy + (fh - drawH) / 2, drawW, drawH);
-                        console.log('[PDF] signature/file drawn OK');
-                    } catch (e) { console.error('[PDF] signature/file draw ERROR:', e.message); }
+                    } catch (e) { console.warn('[PDF] field image error:', e.message); }
                 } else if (val) {
                     const fontSize = Math.max(12, Math.round(14 / scale));
                     ctx.font = `bold ${fontSize}px Heebo, Segoe UI, Arial, sans-serif`;
@@ -2889,7 +2885,6 @@ async function downloadSignedPDF(docId) {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw);
-                    console.log('[PDF] text drawn:', val);
                 }
             }
 
@@ -2903,7 +2898,7 @@ async function downloadSignedPDF(docId) {
                 pdf.addPage([natW, natH], natW > natH ? 'landscape' : 'portrait');
             }
             pdf.addImage(imgData, 'JPEG', 0, 0, natW, natH);
-            yAccum += pgH;
+            yAccum += pgH_editor;
         }
 
         if (pdf) {
