@@ -2799,9 +2799,7 @@ async function downloadSignedPDF(docId) {
     try {
         const EDITOR_W = 800;
         const hasMultiPage = doc.docPages && doc.docPages.length > 1;
-        const pages = hasMultiPage ? doc.docPages : [doc.docImage];
         const pageHeights = doc.pageHeights || [];
-        console.log('[PDF] pages:', pages.length, 'hasMultiPage:', hasMultiPage);
 
         // Helper: load image
         function _loadImg(src) {
@@ -2813,9 +2811,29 @@ async function downloadSignedPDF(docId) {
             });
         }
 
-        // Load all page images
-        const pageImgs = await Promise.all(pages.map(src => _loadImg(src)));
-        console.log('[PDF] images loaded:', pageImgs.map(img => img.naturalWidth + 'x' + img.naturalHeight));
+        // Load page images — split combined image into pages if needed
+        let pageImgs;
+        if (hasMultiPage) {
+            pageImgs = await Promise.all(doc.docPages.map(src => _loadImg(src)));
+        } else if (pageHeights.length > 1) {
+            // Combined image but multiple pages — split into individual canvases
+            const combinedImg = await _loadImg(doc.docImage);
+            pageImgs = [];
+            let yNat = 0;
+            for (const pH of pageHeights) {
+                const c = document.createElement('canvas');
+                c.width = combinedImg.naturalWidth;
+                c.height = pH;
+                c.getContext('2d').drawImage(combinedImg, 0, yNat, combinedImg.naturalWidth, pH, 0, 0, combinedImg.naturalWidth, pH);
+                pageImgs.push(c);
+                yNat += pH;
+            }
+            console.log('[PDF] Split combined image into', pageImgs.length, 'pages');
+        } else {
+            pageImgs = [await _loadImg(doc.docImage)];
+        }
+        console.log('[PDF] pages:', pageImgs.length, 'hasMultiPage:', hasMultiPage,
+            'dims:', pageImgs.map(img => (img.naturalWidth || img.width) + 'x' + (img.naturalHeight || img.height)));
 
         // Get jsPDF constructor (with dynamic fallback load)
         let jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
@@ -2839,23 +2857,25 @@ async function downloadSignedPDF(docId) {
 
         for (let i = 0; i < pageImgs.length; i++) {
             const img = pageImgs[i];
-            const natW = img.naturalWidth;
-            const natH = img.naturalHeight;
+            const natW = img.naturalWidth || img.width;
+            const natH = img.naturalHeight || img.height;
             const scale = EDITOR_W / natW;
 
-            // Create canvas at natural image size
-            const canvas = document.createElement('canvas');
-            canvas.width = natW;
-            canvas.height = natH;
-            const ctx = canvas.getContext('2d');
+            // Create canvas at natural image size (or reuse if already a canvas)
+            let canvas, ctx;
+            if (img instanceof HTMLCanvasElement) {
+                canvas = img;
+                ctx = canvas.getContext('2d');
+            } else {
+                canvas = document.createElement('canvas');
+                canvas.width = natW;
+                canvas.height = natH;
+                ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, natW, natH);
+            }
 
-            // Draw page background
-            ctx.drawImage(img, 0, 0, natW, natH);
-
-            // Draw field overlays
-            // pageHeights are in natural/image space, field coords are in editor space (width=800)
-            // Convert page height to editor space for consistent boundary checks
-            const pgH_editor = pageHeights[i] ? pageHeights[i] * scale : 99999;
+            // Draw field overlays — use actual image height for boundary
+            const pgH_editor = natH * scale;
             const yStart = yAccum;
             const yEnd = yStart + pgH_editor;
 
