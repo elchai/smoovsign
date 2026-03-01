@@ -1579,6 +1579,14 @@ function updateFieldLive(id, key, val) {
 function updateField(id, key, val) {
     const f = DM.fields.find(x => x.id === id);
     if (f) {
+        // Auto-update label when type changes (if label was still the default)
+        const _defaultLabels = { text: 'טקסט', signature: 'חתימה', date_auto: 'תאריך אוטומטי', date_manual: 'בחירת תאריך', number: 'מספר', fullname: 'שם מלא', id_number: 'ת.ז.', checkbox: 'סימון', file: 'צירוף קובץ' };
+        if (key === 'type') {
+            const oldDefault = _defaultLabels[f.type];
+            if (!f.label || f.label === oldDefault) {
+                f.label = _defaultLabels[val] || val;
+            }
+        }
         f[key] = val;
         // Auto-set values when type changes
         if (key === 'type' && val === 'date_auto' && !f.value) {
