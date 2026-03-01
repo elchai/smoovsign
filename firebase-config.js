@@ -333,3 +333,60 @@ async function firebaseDeleteTemplate(tplId) {
         return false;
     }
 }
+
+// ==================== USER PROFILES & TRIAL ====================
+const FULL_ACCESS_EMAILS = [
+    'elchaifinn@gmail.com',
+    'office.liatfine@gmail.com',
+    'sodot.ahava@gmail.com'
+];
+
+async function ensureUserProfile(user) {
+    if (!smoovFirestoreReady || !smoovDb || !user) return null;
+    try {
+        const ref = smoovDb.collection('smoov_users').doc(user.uid);
+        const snap = await ref.get();
+        if (snap.exists) return snap.data();
+
+        // New user — determine plan
+        const email = (user.email || '').toLowerCase();
+        const plan = FULL_ACCESS_EMAILS.includes(email) ? 'full' : 'trial';
+        const profile = {
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || '',
+            photoURL: user.photoURL || '',
+            plan: plan,
+            sendCount: 0,
+            createdAt: new Date().toISOString()
+        };
+        await ref.set(profile);
+        console.log('[user] New profile created:', email, plan);
+
+        // Send notification email for new non-whitelist users
+        if (plan === 'trial' && typeof emailNewUserNotification === 'function') {
+            emailNewUserNotification(user);
+        }
+        return profile;
+    } catch (err) {
+        console.warn('ensureUserProfile error:', err);
+        // Fallback: determine plan from whitelist only (offline)
+        const email = (user.email || '').toLowerCase();
+        return {
+            uid: user.uid, email: user.email || '',
+            plan: FULL_ACCESS_EMAILS.includes(email) ? 'full' : 'trial',
+            sendCount: 0
+        };
+    }
+}
+
+async function incrementSendCount(uid) {
+    if (!smoovFirestoreReady || !smoovDb || !uid) return;
+    try {
+        await smoovDb.collection('smoov_users').doc(uid).update({
+            sendCount: firebase.firestore.FieldValue.increment(1)
+        });
+    } catch (err) {
+        console.warn('incrementSendCount error:', err);
+    }
+}

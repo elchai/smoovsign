@@ -95,6 +95,29 @@ async function emailNotifyOwner(doc, signerName, fieldsInfo) {
     }
 }
 
+// Send notification to owner when a new user registers
+async function emailNewUserNotification(user) {
+    if (!SMOOV_EMAIL.enabled || !SMOOV_EMAIL.ownerEmail) return false;
+    try {
+        await emailjs.send(SMOOV_EMAIL.serviceId, SMOOV_EMAIL.templateOwner, {
+            owner_name: 'SmoovSign',
+            owner_email: SMOOV_EMAIL.ownerEmail,
+            signer_name: user.displayName || 'ללא שם',
+            doc_name: 'הרשמה חדשה - SmoovSign',
+            fields_filled: user.email || '',
+            fields_total: user.uid || '',
+            status: 'חשבון ניסיון',
+            time: new Date().toLocaleString('he-IL'),
+            doc_link: '',
+        });
+        console.log('[email] New user notification sent for:', user.email);
+        return true;
+    } catch (err) {
+        console.warn('[email] New user notification failed:', err);
+        return false;
+    }
+}
+
 // Send copy to signer after they complete signing
 async function emailNotifySigner(doc, signerName, signerEmail) {
     if (!SMOOV_EMAIL.enabled || !signerEmail) return false;

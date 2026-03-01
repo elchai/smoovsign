@@ -22,6 +22,7 @@ const DM = {
     dragOffset: { x: 0, y: 0 },
     resizeStart: {},
     _selectedDocs: [], // multi-select document IDs
+    _userProfile: null, // { plan: 'full'|'trial', sendCount, ... }
     isTemplate: false, // true when creating a template
     editingTemplateId: null,
     signDocId: null,
@@ -201,6 +202,9 @@ function toast(msg, type = 'success') {
 
 // ==================== NAVIGATION ====================
 function switchView(view) {
+    if (DM._userProfile && DM._userProfile.plan === 'trial' && view === 'templates') {
+        toast('תבניות זמינות בחשבון בתשלום', 'error'); return;
+    }
     DM.view = view;
     DM._selectedDocs = []; // clear multi-select on view change
     // Reset sub-filters when switching views
@@ -254,6 +258,7 @@ function renderSidebar() {
             </button>
         </div>
 
+        ${!(DM._userProfile && DM._userProfile.plan === 'trial') ? `
         <button class="sidebar-group-header ${tplOpen ? 'open' : ''}" onclick="toggleSidebarGroup('templates')">
             <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
             תבניות
@@ -266,6 +271,7 @@ function renderSidebar() {
             <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 צ'קליסטים</button>
             <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 אוטומציות</button>
         </div>
+        ` : ''}
 
         <div class="sidebar-divider"></div>
 
@@ -919,7 +925,8 @@ function renderNextBtn() {
         if (DM.recipients.length === 0 || DM.recipients.every(r => !r.name || !r.name.trim())) {
             el.innerHTML = `<button class="btn btn-success btn-lg" onclick="createLinkOnly()">צור קישור לשיתוף</button>`;
         } else {
-            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>`;
+            const _trialInfo = (DM._userProfile && DM._userProfile.plan === 'trial') ? `<div style="font-size:0.72em;color:var(--text-light);margin-top:4px;">${DM._userProfile.sendCount || 0}/10 שליחות</div>` : '';
+            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>${_trialInfo}`;
         }
     }
 }
@@ -2162,6 +2169,12 @@ function saveAsTemplateFromDoc(docId) {
 let _sendingDoc = false;
 function sendDocument() {
     if (_sendingDoc) return;
+    // Trial limit check
+    const _profile = DM._userProfile;
+    if (_profile && _profile.plan === 'trial' && _profile.sendCount >= 10) {
+        toast('הגעת למגבלת חשבון הניסיון (10 שליחות). צור קשר לשדרוג.', 'error');
+        return;
+    }
     if (DM.recipients.length === 0) { toast('יש להוסיף לפחות נמען אחד', 'error'); return; }
     const emptyNames = DM.recipients.filter(r => !r.name || !r.name.trim());
     if (emptyNames.length > 0) { toast('יש להזין שם לכל הנמענים', 'error'); return; }
@@ -2192,6 +2205,12 @@ function sendDocument() {
         };
         DM.docs.push(doc);
         save();
+
+        // Increment trial send count
+        if (_profile && _profile.plan === 'trial' && typeof incrementSendCount === 'function') {
+            _profile.sendCount = (_profile.sendCount || 0) + 1;
+            incrementSendCount(_profile.uid);
+        }
 
         // Save to Firebase for cross-browser signing
         if (typeof firebaseSaveDoc === 'function') {
@@ -4524,6 +4543,14 @@ function onAuthStateChanged(user) {
         userName.textContent = user.displayName || 'משתמש';
         userEmail.textContent = user.email || '';
         if (userNameTopbar) userNameTopbar.textContent = user.displayName || user.email || '';
+
+        // Load user profile (trial/full plan)
+        if (typeof ensureUserProfile === 'function') {
+            ensureUserProfile(user).then(profile => {
+                DM._userProfile = profile;
+                render(); // re-render with profile info (trial badge, template visibility)
+            });
+        }
 
         // Restore images from IndexedDB before first render
         restoreImagesFromIDB().then(() => {
