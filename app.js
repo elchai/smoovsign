@@ -540,6 +540,7 @@ function toggleSelectAllDocs(checked, mode) {
         let docs = mode === 'deleted' ? allDocs.filter(d => d._deleted) : allDocs.filter(d => !d._deleted);
         if (mode === 'sent') docs = docs.filter(d => d.status === 'completed' || (d.recipients || []).some(r => r.signed));
         else if (mode === 'drafts') docs = docs.filter(d => d.status !== 'sent' && d.status !== 'completed');
+        else if (mode === 'waiting') docs = docs.filter(d => d.status !== 'completed' && !(d.expiresAt && new Date(d.expiresAt) < new Date()));
         const search = DM._dashSearch || '';
         if (search) docs = docs.filter(d => (d.fileName || '').includes(search) || (d.recipients || []).some(r => (r.name || '').includes(search)));
         const pageSize = 15;
@@ -1082,7 +1083,14 @@ async function processFile(file) {
         }
     } else if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = ev => { DM.docImage = ev.target.result; render(); };
+        reader.onload = ev => {
+            DM.docImage = ev.target.result;
+            DM.docPages = [ev.target.result];
+            const img = new Image();
+            img.onload = () => { DM.pageHeights = [img.naturalHeight]; DM.pageWidth = img.naturalWidth; render(); };
+            img.onerror = () => render();
+            img.src = ev.target.result;
+        };
         reader.readAsDataURL(file);
     } else {
         toast('סוג קובץ לא נתמך. ניתן להעלות: PDF, Word, JPG, PNG', 'error');
@@ -2113,7 +2121,7 @@ function showLinkSuccess(doc) {
 }
 
 function copySignLink(btn, url) {
-    navigator.clipboard.writeText(url).then(() => {
+    _clipboardCopy(url).then(() => {
         btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> הועתק!';
         btn.style.background = '#dcfce7';
         btn.style.color = '#16a34a';
@@ -2124,7 +2132,7 @@ function copySignLink(btn, url) {
             btn.style.color = 'var(--primary)';
             btn.style.borderColor = '#93c5fd';
         }, 2000);
-    });
+    }).catch(() => toast('שגיאה בהעתקת הקישור', 'error'));
 }
 
 function saveAsTemplateFromDoc(docId) {
@@ -2201,7 +2209,8 @@ function sendDocument() {
                     const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
                     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
                     const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${signUrl}`;
-                    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                    const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                    if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
                 }
             }
         });
@@ -2297,13 +2306,13 @@ function showTemplateLinkSuccess(tpl) {
 
 function copyTemplateFillLink(btn, tplId) {
     const url = `${location.origin}${location.pathname}#fill/${tplId}`;
-    navigator.clipboard.writeText(url).then(() => {
+    _clipboardCopy(url).then(() => {
         const orig = btn.innerHTML;
         btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> הועתק!';
         btn.style.color = '#16a34a';
         btn.style.borderColor = '#16a34a';
         setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
-    });
+    }).catch(() => toast('שגיאה בהעתקת הקישור', 'error'));
 }
 
 // ==================== SIGNING VIEW ====================
@@ -2639,7 +2648,7 @@ function renderSignView(el) {
                         <div style="font-size:0.72em;color:var(--text-light);margin-bottom:4px;">קישור לחתימה:</div>
                         <div style="display:flex;gap:4px;">
                             <input type="text" class="form-input" value="${signUrl}" readonly style="font-size:0.72em;padding:6px;direction:ltr;" onclick="this.select()">
-                            <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${signUrl}');toast('הקישור הועתק!')">העתק</button>
+                            <button class="btn btn-outline btn-sm" onclick="_clipboardCopy('${signUrl}').then(()=>toast('הקישור הועתק!')).catch(()=>toast('שגיאה בהעתקה','error'))">העתק</button>
                         </div>
                     </div>
                     ${!isComplete && !isExpired ? `<button class="btn btn-success" style="width:100%;margin-top:12px;" onclick="completeSign('${doc.id}')">אשר חתימה</button>` : ''}
@@ -2860,7 +2869,8 @@ function sendReminder(docId, recipientId) {
     const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
     const waMsg = `תזכורת: שלום ${r.name}, ממתין לחתימתך על "${doc.fileName}".\nקישור: ${signUrl}`;
-    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+    const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+    if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
     addAudit(doc, 'reminder', `תזכורת נשלחה ל-${r.name}`);
     save(); syncDocToFirebase(doc);
     toast(`תזכורת נשלחה ל-${r.name}`);
@@ -3908,20 +3918,26 @@ function closeShareModal() {
     if (modal) modal.remove();
 }
 
+function _clipboardCopy(text) {
+    return navigator.clipboard.writeText(text).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) { throw e; }
+        finally { ta.remove(); }
+    });
+}
+
 function copyShareUrl() {
     const input = document.getElementById('shareUrlInput');
     if (input) {
         input.select();
-        navigator.clipboard.writeText(input.value).then(() => {
+        _clipboardCopy(input.value).then(() => {
             toast('הקישור הועתק!', 'success');
         }).catch(() => {
-            // Fallback for older browsers
-            try {
-                document.execCommand('copy');
-                toast('הקישור הועתק!', 'success');
-            } catch (err) {
-                toast('שגיאה בהעתקת הקישור', 'error');
-            }
+            toast('שגיאה בהעתקת הקישור', 'error');
         });
     }
 }
