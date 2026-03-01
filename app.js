@@ -21,6 +21,7 @@ const DM = {
     dragItem: null,
     dragOffset: { x: 0, y: 0 },
     resizeStart: {},
+    _selectedDocs: [], // multi-select document IDs
     isTemplate: false, // true when creating a template
     editingTemplateId: null,
     signDocId: null,
@@ -201,6 +202,7 @@ function toast(msg, type = 'success') {
 // ==================== NAVIGATION ====================
 function switchView(view) {
     DM.view = view;
+    DM._selectedDocs = []; // clear multi-select on view change
     // Reset sub-filters when switching views
     if (!view.startsWith('docs_')) { DM._dashFilter = 'all'; DM._dashSearch = ''; }
     closeMobileMenu(); // close sidebar on mobile after navigation
@@ -440,12 +442,14 @@ function renderDocTable(el, mode) {
         ` : `
             <div class="doc-table-wrap">
                 <div class="doc-table-header">
+                    <span class="dtc dtc-check"><input type="checkbox" ${DM._selectedDocs.length > 0 && DM._selectedDocs.length === pageDocs.length ? 'checked' : ''} onchange="toggleSelectAllDocs(this.checked, '${mode}')" title="בחר הכל"></span>
                     <span class="dtc dtc-name">שם מסמך</span>
                     <span class="dtc dtc-rcpt">נשלח אל</span>
                     <span class="dtc dtc-status">סטטוס</span>
                     <span class="dtc dtc-actions"></span>
                 </div>
                 ${renderDocRows(pageDocs, mode)}
+            ${DM._selectedDocs.length > 0 ? renderBulkActionBar() : ''}
             </div>
             ${totalPages > 1 ? `
                 <div class="pagination">
@@ -472,7 +476,11 @@ function renderDocRows(docs, mode) {
         const rcptName = (doc.recipients || [])[0]?.name || '';
         const rcptInitials = rcptName ? rcptName.split(' ').map(w => w[0]).join('').substring(0, 2) : '?';
 
-        return `<div class="doc-table-row" onclick="openSign('${doc.id}')">
+        const isSelected = DM._selectedDocs.includes(doc.id);
+        return `<div class="doc-table-row ${isSelected ? 'selected' : ''}" onclick="openSign('${doc.id}')">
+            <div class="dtc dtc-check" onclick="event.stopPropagation()">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleDocSelect('${doc.id}')">
+            </div>
             <div class="dtc dtc-name">
                 <div>
                     <div style="font-weight:600;font-size:0.9em;">${esc(doc.fileName || 'מסמך ללא שם')}</div>
@@ -516,6 +524,79 @@ function restoreDoc(id) {
     if (doc) { delete doc._deleted; delete doc._deletedAt; }
     save();
     render();
+}
+
+// ==================== MULTI-SELECT ====================
+function toggleDocSelect(docId) {
+    const idx = DM._selectedDocs.indexOf(docId);
+    if (idx >= 0) DM._selectedDocs.splice(idx, 1);
+    else DM._selectedDocs.push(docId);
+    render();
+}
+
+function toggleSelectAllDocs(checked, mode) {
+    if (checked) {
+        const allDocs = DM.docs.slice().reverse();
+        let docs = mode === 'deleted' ? allDocs.filter(d => d._deleted) : allDocs.filter(d => !d._deleted);
+        if (mode === 'sent') docs = docs.filter(d => d.status === 'completed' || (d.recipients || []).some(r => r.signed));
+        else if (mode === 'drafts') docs = docs.filter(d => d.status !== 'sent' && d.status !== 'completed');
+        const search = DM._dashSearch || '';
+        if (search) docs = docs.filter(d => (d.fileName || '').includes(search) || (d.recipients || []).some(r => (r.name || '').includes(search)));
+        const pageSize = 15;
+        const page = DM._docPage || 1;
+        const pageDocs = docs.slice((page - 1) * pageSize, page * pageSize);
+        DM._selectedDocs = pageDocs.map(d => d.id);
+    } else {
+        DM._selectedDocs = [];
+    }
+    render();
+}
+
+function clearDocSelection() {
+    DM._selectedDocs = [];
+    render();
+}
+
+async function bulkDeleteDocs() {
+    const count = DM._selectedDocs.length;
+    if (!count) return;
+    if (!await smoovConfirm(`למחוק ${count} מסמכים?`)) return;
+    DM._selectedDocs.forEach(id => {
+        const doc = DM.docs.find(d => d.id === id);
+        if (doc) { doc._deleted = true; doc._deletedAt = new Date().toISOString(); }
+    });
+    save();
+    DM._selectedDocs = [];
+    render();
+    toast(`${count} מסמכים הועברו לסל המחזור`);
+}
+
+async function bulkDownloadDocs() {
+    const count = DM._selectedDocs.length;
+    if (!count) return;
+    toast(`מוריד ${count} מסמכים...`, 'info');
+    for (const id of DM._selectedDocs) {
+        await downloadSignedPDF(id);
+    }
+    DM._selectedDocs = [];
+    render();
+}
+
+function renderBulkActionBar() {
+    const count = DM._selectedDocs.length;
+    return `<div class="bulk-action-bar">
+        <span style="font-weight:700;font-size:0.9em;">${count} פריטים נבחרו</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();bulkDownloadDocs()" title="הורדה">
+                ${ICO.download} הורדה
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();bulkDeleteDocs()" title="מחיקה">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                מחיקה
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();clearDocSelection()" title="ביטול">✕</button>
+        </div>
+    </div>`;
 }
 
 // ==================== CONTACTS ====================
