@@ -2801,7 +2801,6 @@ async function downloadSignedPDF(docId) {
 
         const jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
         if (!jsPDF) { console.log('[PDF] jsPDF not found'); toast('ספריית PDF לא נטענה', 'error'); return; }
-        console.log('[PDF] jsPDF available');
 
         let pdf = null;
         let yAccum = 0;
@@ -2810,31 +2809,27 @@ async function downloadSignedPDF(docId) {
             const img = pageImgs[i];
             const natW = img.naturalWidth;
             const natH = img.naturalHeight;
-            const scale = EDITOR_W / natW; // scale factor from natural to editor coords
+            const scale = EDITOR_W / natW;
 
-            // Canvas at 2x for quality
+            // Canvas at 1x (natural size) - draw page + field overlays
             const canvas = document.createElement('canvas');
-            const DPR = 2;
-            canvas.width = natW * DPR;
-            canvas.height = natH * DPR;
+            canvas.width = natW;
+            canvas.height = natH;
             const ctx = canvas.getContext('2d');
-            ctx.scale(DPR, DPR);
-
-            // Draw page background image
             ctx.drawImage(img, 0, 0, natW, natH);
+            console.log('[PDF] page', i, 'canvas:', natW, 'x', natH);
 
             // Field Y range for this page
             const pgH = pageHeights[i] || 99999;
             const yStart = yAccum;
             const yEnd = yStart + pgH;
 
-            // Draw field overlays
+            // Draw field overlays on canvas
             for (const f of (doc.fields || [])) {
                 const val = f.signedValue || f.value || '';
                 if (!val && !f.signatureData && !f.fileData) continue;
                 if (f.y + f.h < yStart || f.y >= yEnd) continue;
 
-                // Convert editor coords to natural image coords
                 const fx = f.x / scale;
                 const fy = (f.y - yStart) / scale;
                 const fw = f.w / scale;
@@ -2843,41 +2838,40 @@ async function downloadSignedPDF(docId) {
                 if (f.signatureData || f.fileData) {
                     try {
                         const fImg = await loadImg(f.signatureData || f.fileData);
-                        // Fit image within field bounds (contain)
                         const ratio = Math.min(fw / fImg.naturalWidth, fh / fImg.naturalHeight);
                         const drawW = fImg.naturalWidth * ratio;
                         const drawH = fImg.naturalHeight * ratio;
                         ctx.drawImage(fImg, fx + (fw - drawW) / 2, fy + (fh - drawH) / 2, drawW, drawH);
                     } catch (e) { /* skip broken image */ }
                 } else if (val) {
-                    const fontSize = Math.round(14 / scale);
+                    const fontSize = Math.max(12, Math.round(14 / scale));
                     ctx.font = `bold ${fontSize}px Heebo, Segoe UI, Arial, sans-serif`;
                     ctx.fillStyle = '#1e293b';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.direction = 'rtl';
                     ctx.fillText(val, fx + fw / 2, fy + fh / 2, fw);
                 }
             }
 
-            // Add page to PDF
-            const pdfW = natW;
-            const pdfH = natH;
+            // Convert canvas to JPEG data URL and add to PDF
+            const jpegData = canvas.toDataURL('image/jpeg', 0.92);
+            console.log('[PDF] page', i, 'jpeg length:', jpegData.length);
+
             if (i === 0) {
-                pdf = new jsPDF({ unit: 'px', format: [pdfW, pdfH], orientation: pdfW > pdfH ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
+                pdf = new jsPDF({ unit: 'px', format: [natW, natH], orientation: natW > natH ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
             } else {
-                pdf.addPage([pdfW, pdfH], pdfW > pdfH ? 'landscape' : 'portrait');
+                pdf.addPage([natW, natH], natW > natH ? 'landscape' : 'portrait');
             }
-            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, pdfH);
+            pdf.addImage(jpegData, 'JPEG', 0, 0, natW, natH);
+            console.log('[PDF] page', i, 'added to PDF');
             yAccum += pgH;
         }
 
         if (pdf) {
-            console.log('[PDF] saving PDF...');
+            console.log('[PDF] saving...');
             pdf.save((doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf');
             toast('ה-PDF הורד בהצלחה!');
         } else {
-            console.log('[PDF] pdf object is null - no pages rendered');
             toast('שגיאה: אין עמודים ב-PDF', 'error');
         }
     } catch (err) {
