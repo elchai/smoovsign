@@ -2780,9 +2780,10 @@ async function downloadSignedPDF(docId) {
         const pages = hasMultiPage ? doc.docPages : [doc.docImage];
         const pageHeights = doc.pageHeights || [];
 
-        // Build a hidden DOM container that reproduces the signed document
+        // Build DOM container that reproduces the signed document
+        // Must be on-screen for html2canvas to render correctly (briefly visible during capture)
         container = document.createElement('div');
-        container.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;background:#fff;direction:rtl;font-family:Heebo,sans-serif;';
+        container.style.cssText = 'position:fixed;top:0;left:0;width:' + EDITOR_W + 'px;z-index:99999;background:#fff;direction:rtl;font-family:Heebo,sans-serif;overflow:hidden;';
 
         let yAccum = 0;
         const pageElements = [];
@@ -2868,7 +2869,7 @@ async function downloadSignedPDF(docId) {
                 margin: 0,
                 filename: (doc.fileName || 'signed-document').replace(/\.pdf$/i, '') + '.pdf',
                 image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, width: container.scrollWidth, height: container.scrollHeight },
                 jsPDF: { unit: 'px', format: [EDITOR_W, firstH], orientation: 'portrait', hotfixes: ['px_scaling'] },
                 pagebreak: { mode: ['css'] }
             };
