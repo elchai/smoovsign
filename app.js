@@ -2394,7 +2394,7 @@ function renderSignView(el) {
     const myFields = isSignerView && signerRecipient
         ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
         : (doc.fields || []).filter(f => !f.fixed);
-    const mySignedFields = myFields.filter(f => f.signedValue).length;
+    const mySignedFields = myFields.filter(f => f.signedValue || f.value).length;
     const pct = myFields.length > 0 ? Math.round((mySignedFields / myFields.length) * 100) : 0;
     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
     const hasFieldsToFill = myFields.length > 0;
@@ -2514,7 +2514,7 @@ function renderSignView(el) {
                             ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
                               f.fileData ? `<img src="${f.fileData}" style="width:100%;height:100%;object-fit:contain;" alt="קובץ מצורף">` :
                               val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;text-align:center;width:100%;">${esc(val)}</span>` :
-                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;text-align:center;width:100%;">${esc(f.label || typeLabels[f.type] || f.type)}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
+                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;text-align:center;width:100%;">${esc(f.label || typeLabels[f.type] || f.type)}${f.required ? ' <span style="color:#dc2626;font-weight:800;">*</span>' : ''}</span>` :
                               f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;text-align:center;width:100%;">${esc(f.value)}</span>` :
                               `<span style="font-size:0.75em;color:#888;font-weight:600;text-align:center;width:100%;">${esc(f.label)}</span>`}
                         </div>`;
@@ -2643,7 +2643,7 @@ function navigateSignField(docId, direction) {
         let startIdx = DM._signFieldIdx + 1;
         let found = false;
         for (let i = startIdx; i < allMyFields.length; i++) {
-            if (!allMyFields[i].signedValue) {
+            if (!allMyFields[i].signedValue && !allMyFields[i].value) {
                 DM._signFieldIdx = i;
                 found = true;
                 break;
@@ -2659,7 +2659,7 @@ function navigateSignField(docId, direction) {
         let startIdx = Math.min(DM._signFieldIdx - 1, allMyFields.length - 1);
         let found = false;
         for (let i = startIdx; i >= 0; i--) {
-            if (!allMyFields[i].signedValue) {
+            if (!allMyFields[i].signedValue && !allMyFields[i].value) {
                 DM._signFieldIdx = i;
                 found = true;
                 break;
@@ -2687,10 +2687,10 @@ function updateSignNavButton(docId) {
     const myFields = isSignerView && signerRecipient
         ? (doc.fields || []).filter(f => f.assigneeId === signerRecipient.id && !f.fixed)
         : (doc.fields || []).filter(f => !f.fixed);
-    const allFilled = myFields.length > 0 && myFields.every(f => f.signedValue);
+    const allFilled = myFields.length > 0 && myFields.every(f => f.signedValue || f.value);
 
     if (allFilled) {
-        mainBtn.textContent = 'סיום';
+        mainBtn.textContent = 'אשר חתימה';
         mainBtn.setAttribute('onclick', `completeSign('${docId}')`);
     } else {
         mainBtn.textContent = 'הבא';
@@ -3892,10 +3892,10 @@ async function loadAndCloneTemplate(tplId) {
             fields: (tpl.fields || []).map(f => ({
                 ...f,
                 id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                signedValue: null,
+                signedValue: (!f.fixed && f.type === 'date_auto') ? new Date().toLocaleDateString('he-IL') : null,
                 signatureData: null,
                 fileData: null,
-                value: f.fixed ? f.value : (f.type === 'date_auto' ? new Date().toLocaleDateString('he-IL') : (f.type === 'checkbox' && f.defaultChecked ? '\u2713' : ''))
+                value: f.fixed ? f.value : ''
             })),
             status: 'sent',
             templateId: tplId,
