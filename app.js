@@ -3960,6 +3960,8 @@ async function loadAndCloneTemplate(tplId) {
         }
 
         console.log('[fill] New doc created:', docId, { hasImage: !!newDoc.docImage, fields: newDoc.fields.length, signer: DM._currentSigner });
+        console.log('[fill] Template fields:', (tpl.fields||[]).map(f => ({type: f.type, label: f.label, fixed: f.fixed})));
+        console.log('[fill] Cloned fields:', newDoc.fields.map(f => ({type: f.type, label: f.label, value: f.value, signedValue: f.signedValue})));
         DM.docs.push(newDoc);
         save();
         if (typeof firebaseSaveDoc === 'function') firebaseSaveDoc(newDoc);
