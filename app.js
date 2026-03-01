@@ -2424,11 +2424,12 @@ function renderSignView(el) {
 
     el.innerHTML = `<div class="wizard">
         <!-- Sign Header -->
+        ${mainBtnText ? `<div style="position:fixed;bottom:24px;left:24px;z-index:1000;display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+            <button class="btn btn-primary btn-lg sign-main-btn" onclick="${mainBtnAction}" style="padding:14px 32px;font-size:1em;border-radius:14px;box-shadow:0 4px 20px rgba(37,99,235,0.35);">${mainBtnText}</button>
+            ${DM._signFieldIdx > 0 ? `<button class="btn btn-ghost" onclick="navigateSignField('${doc.id}','prev')" style="font-size:0.82em;">הקודם</button>` : ''}
+        </div>` : ''}
         <div class="sign-header">
-            <div class="sign-header-actions">
-                ${mainBtnText ? `<button class="btn btn-primary btn-lg sign-main-btn" onclick="${mainBtnAction}">${mainBtnText}</button>` : ''}
-                ${DM._signFieldIdx > 0 ? `<button class="btn btn-ghost" onclick="navigateSignField('${doc.id}','prev')" style="font-size:0.88em;">הקודם</button>` : ''}
-            </div>
+            <div class="sign-header-actions"></div>
             <div class="sign-header-tools">
                 ${!isSignerView ? `<button class="btn btn-outline btn-sm" onclick="toggleAuditLog()" title="יומן">${ICO.log}</button>` : ''}
                 <button class="btn btn-outline btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורד">${ICO.download}</button>
