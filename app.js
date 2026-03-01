@@ -2509,14 +2509,14 @@ function renderSignView(el) {
                         const typeLabels = { signature: 'שדה חתימה', date_auto: 'תאריך', date_manual: 'תאריך', fullname: 'שם מלא', id_number: 'תעודת זהות', text: 'שדה טקסט', number: 'מספר', file: 'קובץ', checkbox: '☐' };
                         return `<div class="sign-field ${canSign ? 'mine' : ''}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;border-radius:20px;
                             ${val ? `background:${c.bg};border:1.5px solid ${c.border};` : canSign ? `background:${c.bg}80;border:2px solid ${c.border};` : `background:rgba(200,200,200,0.3);border:1px dashed #ccc;`}"
-                            ${canSign ? `onmousedown="event.preventDefault();signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}
+                            ${canSign ? `onclick="signField('${doc.id}',${JSON.stringify(f.id).replace(/"/g, '&quot;')})"` : ''}
                             ${f.required && canSign ? 'title="שדה חובה"' : ''}>
                             ${f.signatureData ? `<img src="${f.signatureData}" style="width:100%;height:100%;object-fit:contain;" alt="חתימה">` :
                               f.fileData ? `<img src="${f.fileData}" style="width:100%;height:100%;object-fit:contain;" alt="קובץ מצורף">` :
-                              val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;">${esc(val)}</span>` :
-                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;">${esc(f.label || typeLabels[f.type] || f.type)}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
-                              f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;">${esc(f.value)}</span>` :
-                              `<span style="font-size:0.75em;color:#888;font-weight:600;">${esc(f.label)}</span>`}
+                              val ? `<span style="font-size:0.85em;font-weight:700;color:${c.text};padding:0 6px;text-align:center;width:100%;">${esc(val)}</span>` :
+                              canSign ? `<span style="font-size:0.78em;color:${c.text};font-weight:700;text-align:center;width:100%;">${esc(f.label || typeLabels[f.type] || f.type)}</span>${f.required ? '<span style="color:#dc2626;font-weight:800;margin-right:2px;">*</span>' : ''}` :
+                              f.fixed && f.value ? `<span style="font-size:0.85em;font-weight:700;color:#1e293b;padding:0 6px;text-align:center;width:100%;">${esc(f.value)}</span>` :
+                              `<span style="font-size:0.75em;color:#888;font-weight:600;text-align:center;width:100%;">${esc(f.label)}</span>`}
                         </div>`;
                     }).join('')}
                 </div>
@@ -3034,7 +3034,7 @@ function signField(docId, fieldId) {
             if (e.key === 'Enter') { e.preventDefault(); commitValue(); }
             if (e.key === 'Escape') { committed = true; render(); }
         });
-        inp.addEventListener('blur', commitValue);
+        inp.addEventListener('blur', () => setTimeout(commitValue, 150));
         return; // don't call highlightNextField yet - wait for commit
     }
     // Move to next unsigned field
