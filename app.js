@@ -3846,9 +3846,14 @@ function completeSign(docId) {
         const signedF = (doc.fields || []).filter(f => f.signedValue).length;
         const allDone = doc.status === 'completed';
         const sName = isSignerView ? DM._currentSigner : 'בעל המסמך';
+        console.log('[email-debug] Sending owner email:', { createdBy: doc.createdBy, signer: sName, filled: signedF, total: totalF, allDone });
         emailNotifyOwner(doc, sName, { filled: signedF, total: totalF, allDone }).then(ok => {
-            if (!ok) console.warn('Email notification failed');
+            console.log('[email-debug] emailNotifyOwner result:', ok);
+        }).catch(err => {
+            console.error('[email-debug] emailNotifyOwner error:', err);
         });
+    } else {
+        console.warn('[email-debug] emailNotifyOwner function not found');
     }
     if (isSignerView && DM._currentSignerEmail && typeof emailNotifySigner === 'function') {
         emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
