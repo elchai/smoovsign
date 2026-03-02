@@ -202,9 +202,6 @@ function toast(msg, type = 'success') {
 
 // ==================== NAVIGATION ====================
 function switchView(view) {
-    if (DM._userProfile && DM._userProfile.plan === 'trial' && view === 'templates') {
-        toast('תבניות זמינות בחשבון בתשלום', 'error'); return;
-    }
     DM.view = view;
     DM._selectedDocs = []; // clear multi-select on view change
     // Reset sub-filters when switching views
@@ -258,7 +255,6 @@ function renderSidebar() {
             </button>
         </div>
 
-        ${!(DM._userProfile && DM._userProfile.plan === 'trial') ? `
         <button class="sidebar-group-header ${tplOpen ? 'open' : ''}" onclick="toggleSidebarGroup('templates')">
             <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
             תבניות
@@ -271,7 +267,6 @@ function renderSidebar() {
             <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 צ'קליסטים</button>
             <button class="sidebar-item sidebar-sub locked" title="בקרוב">🔒 אוטומציות</button>
         </div>
-        ` : ''}
 
         <div class="sidebar-divider"></div>
 
@@ -925,8 +920,7 @@ function renderNextBtn() {
         if (DM.recipients.length === 0 || DM.recipients.every(r => !r.name || !r.name.trim())) {
             el.innerHTML = `<button class="btn btn-success btn-lg" onclick="createLinkOnly()">צור קישור לשיתוף</button>`;
         } else {
-            const _trialInfo = (DM._userProfile && DM._userProfile.plan === 'trial') ? `<div style="font-size:0.72em;color:var(--text-light);margin-top:4px;">${DM._userProfile.sendCount || 0}/10 שליחות</div>` : '';
-            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>${_trialInfo}`;
+            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendDocument()">שלח מסמך</button>`;
         }
     }
 }
@@ -2169,12 +2163,6 @@ function saveAsTemplateFromDoc(docId) {
 let _sendingDoc = false;
 function sendDocument() {
     if (_sendingDoc) return;
-    // Trial limit check
-    const _profile = DM._userProfile;
-    if (_profile && _profile.plan === 'trial' && _profile.sendCount >= 10) {
-        toast('הגעת למגבלת חשבון הניסיון (10 שליחות). צור קשר לשדרוג.', 'error');
-        return;
-    }
     if (DM.recipients.length === 0) { toast('יש להוסיף לפחות נמען אחד', 'error'); return; }
     const emptyNames = DM.recipients.filter(r => !r.name || !r.name.trim());
     if (emptyNames.length > 0) { toast('יש להזין שם לכל הנמענים', 'error'); return; }
@@ -2205,12 +2193,6 @@ function sendDocument() {
         };
         DM.docs.push(doc);
         save();
-
-        // Increment trial send count
-        if (_profile && _profile.plan === 'trial' && typeof incrementSendCount === 'function') {
-            _profile.sendCount = (_profile.sendCount || 0) + 1;
-            incrementSendCount(_profile.uid);
-        }
 
         // Save to Firebase for cross-browser signing
         if (typeof firebaseSaveDoc === 'function') {
@@ -2497,6 +2479,7 @@ function renderSignView(el) {
                 </button>
                 <div style="margin-top:28px;padding-top:24px;border-top:1px solid #e2e8f0;text-align:center;">
                     <div style="font-size:0.78em;color:#94a3b8;">מערכת זו פותחה ע"י אלחי פיין <a href="https://www.daghazahav.com" target="_blank" style="color:#64748b;text-decoration:underline;">DAGHAZAHAV</a></div>
+                    <div style="margin-top:8px;"><a href="https://api.whatsapp.com/send?phone=972542012000&text=%D7%A9%D7%9C%D7%95%D7%9D%20%D7%90%D7%9C%D7%97%D7%99%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A2%D7%9C%20%D7%91%D7%A0%D7%99%D7%99%D7%AA%20%D7%9E%D7%A2%D7%A8%D7%9B%D7%AA%20%D7%9C%D7%97%D7%98%D7%99%D7%9E%D7%94%20%D7%93%D7%99%D7%92%D7%99%D7%98%D7%9C%D7%99%D7%AA" target="_blank" style="font-size:0.78em;color:#25D366;text-decoration:underline;">רוצה מערכת חתימות דיגיטלית משלך? דבר איתנו</a></div>
                 </div>
             </div>
         </div>`;
@@ -2579,6 +2562,7 @@ function renderSignView(el) {
         ${isSignerView ? `
         <div style="padding:16px 24px;text-align:center;border-bottom:1px solid var(--border);">
             <div style="font-size:0.78em;color:#94a3b8;">מערכת זו פותחה ע"י אלחי פיין <a href="https://www.daghazahav.com" target="_blank" style="color:#64748b;text-decoration:underline;">DAGHAZAHAV</a></div>
+            <div style="margin-top:8px;"><a href="https://api.whatsapp.com/send?phone=972542012000&text=%D7%A9%D7%9C%D7%95%D7%9D%20%D7%90%D7%9C%D7%97%D7%99%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A4%D7%A8%D7%98%D7%99%D7%9D%20%D7%A2%D7%9C%20%D7%91%D7%A0%D7%99%D7%99%D7%AA%20%D7%9E%D7%A2%D7%A8%D7%9B%D7%AA%20%D7%9C%D7%97%D7%98%D7%99%D7%9E%D7%94%20%D7%93%D7%99%D7%92%D7%99%D7%98%D7%9C%D7%99%D7%AA" target="_blank" style="font-size:0.78em;color:#25D366;text-decoration:underline;">רוצה מערכת חתימות דיגיטלית משלך? דבר איתנו</a></div>
         </div>` : ''}` : ''}
         ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
         ${!isSignerView ? `
