@@ -2495,13 +2495,8 @@ function renderSignView(el) {
                 <button class="btn btn-primary btn-lg" onclick="downloadSignedPDF('${doc.id}')" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;">
                     ${ICO.download} הורד מסמך חתום
                 </button>
-                <div style="margin-top:28px;padding-top:24px;border-top:1px solid #e2e8f0;">
-                    <div style="font-size:1.05em;font-weight:700;color:#1e293b;margin-bottom:4px;">איזה כיף! נכון שזה היה פשוט?</div>
-                    <div style="font-size:0.85em;color:#64748b;margin-bottom:14px;">צרו מסמכים דיגיטליים ואספו חתימות בקלות</div>
-                    <a href="${location.origin}${location.pathname}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:white;padding:10px 24px;border-radius:10px;font-weight:700;font-size:0.88em;text-decoration:none;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
-                        <svg width="18" height="18" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="rgba(255,255,255,0.25)"/><path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="3.5"/><polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/><path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
-                        פתחו חשבון SmoovSign בחינם
-                    </a>
+                <div style="margin-top:28px;padding-top:24px;border-top:1px solid #e2e8f0;text-align:center;">
+                    <div style="font-size:0.78em;color:#94a3b8;">מערכת זו פותחה ע"י אלחי פיין <a href="https://www.daghazahav.com" target="_blank" style="color:#64748b;text-decoration:underline;">DAGHAZAHAV</a></div>
                 </div>
             </div>
         </div>`;
@@ -2582,13 +2577,8 @@ function renderSignView(el) {
             </div>
         </div>
         ${isSignerView ? `
-        <div style="background:linear-gradient(135deg,#eff6ff,#f0f9ff);padding:20px 24px;text-align:center;border-bottom:1px solid var(--border);">
-            <div style="font-size:1.15em;font-weight:700;color:var(--text);margin-bottom:4px;">איזה כיף! נכון שזה היה פשוט?</div>
-            <div style="font-size:0.88em;color:var(--text-light);margin-bottom:14px;">צרו מסמכים דיגיטליים ואספו חתימות בקלות</div>
-            <a href="${location.origin}${location.pathname}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:white;padding:10px 24px;border-radius:10px;font-weight:700;font-size:0.92em;text-decoration:none;box-shadow:0 4px 12px rgba(37,99,235,0.3);transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
-                <svg width="22" height="22" viewBox="0 0 100 100"><defs><linearGradient id="cta-lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e0e7ff"/></linearGradient></defs><rect width="100" height="100" rx="20" fill="rgba(255,255,255,0.25)"/><path d="M58 16H36a8 8 0 00-8 8v52a8 8 0 008 8h28a8 8 0 008-8V42l-14-26z" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="3.5"/><polyline points="58 16 58 42 72 42" fill="none" stroke="white" stroke-width="3.5"/><path d="M36 60c8-12 14 4 18-4s8-14 12-4" stroke="white" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
-                פתחו חשבון SmoovSign בחינם
-            </a>
+        <div style="padding:16px 24px;text-align:center;border-bottom:1px solid var(--border);">
+            <div style="font-size:0.78em;color:#94a3b8;">מערכת זו פותחה ע"י אלחי פיין <a href="https://www.daghazahav.com" target="_blank" style="color:#64748b;text-decoration:underline;">DAGHAZAHAV</a></div>
         </div>` : ''}` : ''}
         ${isExpired && !isComplete ? `<div class="expiry-banner">תוקף המסמך פג ב-${new Date(doc.expiresAt).toLocaleDateString('he-IL')}. לא ניתן לחתום.</div>` : ''}
         ${!isSignerView ? `
