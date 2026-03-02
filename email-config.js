@@ -73,12 +73,14 @@ function initSmoovEmail() {
 
 // Send notification to document owner when someone signs
 async function emailNotifyOwner(doc, signerName, fieldsInfo) {
-    if (!SMOOV_EMAIL.enabled || !SMOOV_EMAIL.ownerEmail) return false;
+    if (!SMOOV_EMAIL.enabled) return false;
+    const recipientEmail = doc.createdBy || SMOOV_EMAIL.ownerEmail;
+    if (!recipientEmail) return false;
     try {
         const signUrl = `https://smoovsign.com/app.html#sign/${doc.id}`;
         await emailjs.send(SMOOV_EMAIL.serviceId, SMOOV_EMAIL.templateOwner, {
             owner_name: SMOOV_EMAIL.ownerName,
-            owner_email: SMOOV_EMAIL.ownerEmail,
+            owner_email: recipientEmail,
             signer_name: signerName,
             doc_name: doc.fileName || 'מסמך',
             fields_filled: fieldsInfo ? String(fieldsInfo.filled) : '0',
@@ -87,7 +89,7 @@ async function emailNotifyOwner(doc, signerName, fieldsInfo) {
             time: new Date().toLocaleString('he-IL'),
             doc_link: signUrl,
         });
-        console.log('Owner email sent');
+        console.log('Owner email sent to:', recipientEmail);
         return true;
     } catch (err) {
         console.warn('Owner email failed:', err);
