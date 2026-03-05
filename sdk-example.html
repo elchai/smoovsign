@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmoovSign SDK - דוגמת שימוש</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; padding: 40px; direction: rtl; }
+        h1 { margin-bottom: 20px; }
+        .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; text-align: left; font-size: 14px; line-height: 1.6; }
+        .keyword { color: #7dd3fc; }
+        .string { color: #86efac; }
+        .comment { color: #94a3b8; }
+        .fn { color: #c4b5fd; }
+        h2 { margin-bottom: 12px; font-size: 1.1em; }
+        h3 { margin: 16px 0 8px; font-size: 0.95em; color: #475569; }
+        p { color: #64748b; margin-bottom: 12px; line-height: 1.6; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; direction: ltr; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; direction: ltr; text-align: left; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; }
+        th { background: #f8fafc; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>SmoovSign SDK</h1>
+    <p>SDK קליינט לשימוש ב-SmoovSign מכל פרויקט אחר. מתחבר ישירות ל-Firebase ללא צורך בשרת.</p>
+
+    <div class="card">
+        <h2>1. טעינת ה-SDK</h2>
+        <pre><span class="comment">&lt;!-- Firebase SDK (חובה) --&gt;</span>
+&lt;script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"&gt;&lt;/script&gt;
+&lt;script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"&gt;&lt;/script&gt;
+
+<span class="comment">&lt;!-- SmoovSign SDK --&gt;</span>
+&lt;script src="https://smoovsign.com/smoov-sdk.js"&gt;&lt;/script&gt;</pre>
+    </div>
+
+    <div class="card">
+        <h2>2. אתחול</h2>
+        <pre><span class="keyword">const</span> smoov = <span class="keyword">new</span> <span class="fn">SmoovSDK</span>();</pre>
+        <p>ה-SDK מתחבר אוטומטית ל-Firebase של SmoovSign. אין צורך בהגדרות נוספות.</p>
+    </div>
+
+    <div class="card">
+        <h2>3. יצירת מסמך לחתימה</h2>
+        <pre><span class="keyword">const</span> result = <span class="keyword">await</span> smoov.<span class="fn">createDocument</span>({
+    fileName: <span class="string">'חוזה שכירות'</span>,
+    docImage: <span class="string">'data:image/png;base64,...'</span>,  <span class="comment">// תמונת המסמך</span>
+    recipients: [
+        { name: <span class="string">'ישראל ישראלי'</span>, phone: <span class="string">'0541234567'</span> }
+    ],
+    fields: [
+        { type: <span class="string">'signature'</span>, label: <span class="string">'חתימה'</span>, x: 100, y: 500, w: 200, h: 60 },
+        { type: <span class="string">'date_auto'</span>, label: <span class="string">'תאריך'</span>, x: 350, y: 500, w: 150, h: 40 },
+        { type: <span class="string">'text'</span>, label: <span class="string">'שם מלא'</span>, x: 100, y: 440, w: 200, h: 40 }
+    ],
+    createdBy: <span class="string">'elchaifinn@gmail.com'</span>
+});
+
+console.log(result.id);       <span class="comment">// dm_1234567890_abc123</span>
+console.log(result.signUrl);  <span class="comment">// https://smoovsign.com/app.html#sign/dm_...</span></pre>
+    </div>
+
+    <div class="card">
+        <h2>4. יצירה מתוך תבנית</h2>
+        <pre><span class="keyword">const</span> result = <span class="keyword">await</span> smoov.<span class="fn">createFromTemplate</span>(<span class="string">'tpl_1234567890'</span>, {
+    recipients: [{ name: <span class="string">'חיים כהן'</span>, phone: <span class="string">'0509876543'</span> }],
+    createdBy: <span class="string">'elchaifinn@gmail.com'</span>
+});
+
+console.log(result.signUrl);  <span class="comment">// קישור לחתימה</span>
+console.log(result.fillUrl);  <span class="comment">// קישור למילוי תבנית</span></pre>
+    </div>
+
+    <div class="card">
+        <h2>5. בדיקת סטטוס מסמך</h2>
+        <pre><span class="keyword">const</span> status = <span class="keyword">await</span> smoov.<span class="fn">getStatus</span>(<span class="string">'dm_1234567890_abc123'</span>);
+
+console.log(status.isComplete);       <span class="comment">// true/false</span>
+console.log(status.completedFields);  <span class="comment">// 2</span>
+console.log(status.totalFields);      <span class="comment">// 3</span>
+console.log(status.status);           <span class="comment">// 'sent' | 'completed'</span></pre>
+    </div>
+
+    <div class="card">
+        <h2>6. האזנה בזמן אמת</h2>
+        <pre><span class="comment">// קבל עדכון בכל שינוי במסמך</span>
+<span class="keyword">const</span> unsubscribe = smoov.<span class="fn">onDocumentChange</span>(<span class="string">'dm_...'</span>, doc => {
+    console.log(<span class="string">'מסמך עודכן:'</span>, doc.status);
+});
+
+<span class="comment">// או: חכה עד שהמסמך נחתם</span>
+<span class="keyword">const</span> signed = <span class="keyword">await</span> smoov.<span class="fn">waitForCompletion</span>(<span class="string">'dm_...'</span>, 60000); <span class="comment">// timeout 60 שניות</span></pre>
+    </div>
+
+    <div class="card">
+        <h2>7. רשימת מסמכים / תבניות</h2>
+        <pre><span class="keyword">const</span> docs = <span class="keyword">await</span> smoov.<span class="fn">listDocuments</span>(<span class="string">'elchaifinn@gmail.com'</span>);
+<span class="keyword">const</span> templates = <span class="keyword">await</span> smoov.<span class="fn">listTemplates</span>(<span class="string">'elchaifinn@gmail.com'</span>);</pre>
+    </div>
+
+    <div class="card">
+        <h2>סוגי שדות נתמכים</h2>
+        <table>
+            <tr><th>type</th><th>תיאור</th></tr>
+            <tr><td><code>signature</code></td><td>חתימה (canvas)</td></tr>
+            <tr><td><code>text</code></td><td>טקסט חופשי</td></tr>
+            <tr><td><code>fullname</code></td><td>שם מלא</td></tr>
+            <tr><td><code>id_number</code></td><td>תעודת זהות</td></tr>
+            <tr><td><code>date</code></td><td>תאריך (ידני)</td></tr>
+            <tr><td><code>date_auto</code></td><td>תאריך אוטומטי</td></tr>
+            <tr><td><code>checkbox</code></td><td>תיבת סימון</td></tr>
+            <tr><td><code>file</code></td><td>העלאת קובץ / צילום</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>API מלא</h2>
+        <table>
+            <tr><th>Method</th><th>תיאור</th></tr>
+            <tr><td><code>createDocument(opts)</code></td><td>יצירת מסמך חדש לחתימה</td></tr>
+            <tr><td><code>createFromTemplate(tplId, opts)</code></td><td>יצירת מסמך מתוך תבנית קיימת</td></tr>
+            <tr><td><code>getDocument(docId)</code></td><td>טעינת מסמך מלא (כולל תמונות)</td></tr>
+            <tr><td><code>getStatus(docId)</code></td><td>סטטוס מסמך (בלי תמונות, מהיר)</td></tr>
+            <tr><td><code>listDocuments(email)</code></td><td>רשימת מסמכים לפי יוצר</td></tr>
+            <tr><td><code>listTemplates(email)</code></td><td>רשימת תבניות לפי יוצר</td></tr>
+            <tr><td><code>onDocumentChange(docId, cb)</code></td><td>האזנה לשינויים בזמן אמת</td></tr>
+            <tr><td><code>waitForCompletion(docId, timeout)</code></td><td>Promise שמתקיים כשהמסמך נחתם</td></tr>
+            <tr><td><code>getSignUrl(docId)</code></td><td>קבלת קישור לחתימה</td></tr>
+            <tr><td><code>getFillUrl(tplId)</code></td><td>קבלת קישור למילוי תבנית</td></tr>
+            <tr><td><code>openSignPage(docId)</code></td><td>פתיחת דף חתימה בחלון חדש</td></tr>
+            <tr><td><code>deleteDocument(docId)</code></td><td>מחיקת מסמך</td></tr>
+        </table>
+    </div>
+</body>
+</html>
