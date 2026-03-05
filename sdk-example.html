@@ -101,6 +101,60 @@ console.log(status.status);           <span class="comment">// 'sent' | 'complet
 <span class="keyword">const</span> templates = <span class="keyword">await</span> smoov.<span class="fn">listTemplates</span>(<span class="string">'elchaifinn@gmail.com'</span>);</pre>
     </div>
 
+    <div class="card" style="border: 2px solid #2563eb; background: linear-gradient(135deg, #eff6ff, #f0fdf4);">
+        <h2>8. לינקים אישיים + Google Sheets (חדש!)</h2>
+        <p>שלח לכל אדם לינק אישי עם פרטים ממולאים מראש. כשהוא חותם, הנתונים נשלחים אוטומטית ל-Google Sheet + החתימה נשמרת כ-PDF ב-Drive.</p>
+        <h3>שלב א: הגדרת Google Apps Script (פעם אחת)</h3>
+        <pre><span class="comment">// 1. פתח Google Sheet חדש</span>
+<span class="comment">// 2. Extensions > Apps Script</span>
+<span class="comment">// 3. העתק את הקוד מ-webhook-sheets-template.js</span>
+<span class="comment">// 4. שנה את SHEET_ID</span>
+<span class="comment">// 5. Deploy > New deployment > Web app</span>
+<span class="comment">// 6. קבל URL כמו:</span>
+<span class="keyword">const</span> WEBHOOK = <span class="string">'https://script.google.com/macros/s/AKfyc.../exec'</span>;</pre>
+
+        <h3>שלב ב: שליחת לינקים אישיים</h3>
+        <pre><span class="keyword">const</span> links = <span class="keyword">await</span> smoov.<span class="fn">createPersonalLinks</span>({
+    fileName: <span class="string">'שאלון נשקים'</span>,
+    docImage: <span class="string">'data:image/png;base64,...'</span>,
+    webhookUrl: WEBHOOK,
+    webhookMeta: { project: <span class="string">'weapons'</span>, unit: <span class="string">'battalion-1875'</span> },
+    fields: [
+        { type: <span class="string">'text'</span>, label: <span class="string">'שם פרטי'</span>, x: 100, y: 100, w: 200, h: 40 },
+        { type: <span class="string">'text'</span>, label: <span class="string">'מס אישי'</span>, x: 100, y: 160, w: 200, h: 40 },
+        { type: <span class="string">'text'</span>, label: <span class="string">'ת.ז.'</span>, x: 100, y: 220, w: 200, h: 40 },
+        { type: <span class="string">'text'</span>, label: <span class="string">'טלפון'</span>, x: 100, y: 280, w: 200, h: 40 },
+        { type: <span class="string">'signature'</span>, label: <span class="string">'חתימה'</span>, x: 100, y: 360, w: 250, h: 80 }
+    ],
+    people: [
+        {
+            name: <span class="string">'ישראל כהן'</span>,
+            phone: <span class="string">'0541234567'</span>,
+            data: { <span class="string">'שם פרטי'</span>: <span class="string">'ישראל'</span>, <span class="string">'מס אישי'</span>: <span class="string">'8234567'</span> }
+        },
+        {
+            name: <span class="string">'דוד לוי'</span>,
+            phone: <span class="string">'0509876543'</span>,
+            data: { <span class="string">'שם פרטי'</span>: <span class="string">'דוד'</span>, <span class="string">'מס אישי'</span>: <span class="string">'7654321'</span> }
+        }
+    ]
+});
+
+<span class="comment">// links = [</span>
+<span class="comment">//   { name: 'ישראל כהן', phone: '054...', id: 'dm_...', signUrl: 'https://...' },</span>
+<span class="comment">//   { name: 'דוד לוי',   phone: '050...', id: 'dm_...', signUrl: 'https://...' }</span>
+<span class="comment">// ]</span>
+
+<span class="comment">// שלח בוואטסאפ:</span>
+links.forEach(l => {
+    <span class="keyword">const</span> intl = l.phone.replace(<span class="string">/^0/</span>, <span class="string">'972'</span>);
+    window.open(<span class="string">`https://wa.me/${intl}?text=שלום ${l.name}, מלא שאלון: ${l.signUrl}`</span>);
+});</pre>
+
+        <h3>מה קורה כשהחייל חותם?</h3>
+        <p>1. הפרטים הממולאים מראש מופיעים בטופס (שם, מס' אישי וכו') &rarr; 2. החייל משלים את השדות החסרים וחותם &rarr; 3. הנתונים + קישור לתמונת החתימה נוספים אוטומטית לגיליון ב-Google Sheets &rarr; 4. החתימה נשמרת כקובץ ב-Google Drive</p>
+    </div>
+
     <div class="card">
         <h2>סוגי שדות נתמכים</h2>
         <table>
@@ -122,6 +176,7 @@ console.log(status.status);           <span class="comment">// 'sent' | 'complet
             <tr><th>Method</th><th>תיאור</th></tr>
             <tr><td><code>createDocument(opts)</code></td><td>יצירת מסמך חדש לחתימה</td></tr>
             <tr><td><code>createFromTemplate(tplId, opts)</code></td><td>יצירת מסמך מתוך תבנית קיימת</td></tr>
+            <tr><td><code>createPersonalLinks(opts)</code></td><td>יצירת לינקים אישיים לרשימת אנשים (batch) עם prefill + webhook</td></tr>
             <tr><td><code>getDocument(docId)</code></td><td>טעינת מסמך מלא (כולל תמונות)</td></tr>
             <tr><td><code>getStatus(docId)</code></td><td>סטטוס מסמך (בלי תמונות, מהיר)</td></tr>
             <tr><td><code>listDocuments(email)</code></td><td>רשימת מסמכים לפי יוצר</td></tr>

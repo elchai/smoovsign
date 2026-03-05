@@ -3833,6 +3833,11 @@ function completeSign(docId) {
         emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
     }
 
+    // Webhook: POST completed form data to external endpoint (Google Apps Script, etc.)
+    if (doc.webhookUrl && doc.status === 'completed') {
+        _fireWebhook(doc).catch(err => console.warn('[webhook] error:', err));
+    }
+
     if (isSignerView) {
         // Stay on the sign view to show completion
         render();
@@ -3845,6 +3850,51 @@ function completeSign(docId) {
     console.error('completeSign error:', err);
     toast('שגיאה באישור החתימה: ' + friendlyError(err), 'error');
   }
+}
+
+// ==================== WEBHOOK ====================
+async function _fireWebhook(doc) {
+    if (!doc.webhookUrl) return;
+    try {
+        // Collect field values
+        const fieldData = {};
+        (doc.fields || []).forEach(f => {
+            const key = f.label || f.type || f.id;
+            if (f.signatureData) fieldData[key] = f.signatureData; // base64 signature image
+            else if (f.fileData) fieldData[key] = f.fileData;
+            else fieldData[key] = f.signedValue || f.value || '';
+        });
+
+        // Build payload
+        const payload = {
+            docId: doc.id,
+            fileName: doc.fileName,
+            completedAt: doc.completedAt || new Date().toISOString(),
+            recipients: (doc.recipients || []).map(r => ({
+                name: r.name, email: r.email || '', phone: r.phone || '',
+                signedAt: r.signedAt || ''
+            })),
+            fields: fieldData,
+            prefillData: doc.prefillData || {},
+            meta: doc.webhookMeta || {},
+            signUrl: `${location.origin}${location.pathname}#sign/${doc.id}`
+        };
+
+        console.log('[webhook] Sending to:', doc.webhookUrl);
+        const resp = await fetch(doc.webhookUrl, {
+            method: 'POST',
+            mode: 'no-cors', // Google Apps Script requires no-cors from browser
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+        });
+        console.log('[webhook] Sent successfully');
+        addAudit(doc, 'webhook', 'נתונים נשלחו ל-webhook');
+        save(); syncDocToFirebase(doc);
+    } catch (err) {
+        console.error('[webhook] Failed:', err);
+        addAudit(doc, 'webhook_error', 'שגיאה בשליחת webhook: ' + (err.message || err));
+        save(); syncDocToFirebase(doc);
+    }
 }
 
 // ==================== SHARE DOCUMENT ====================
@@ -4568,6 +4618,16 @@ function onAuthStateChanged(user) {
 // Init: hide app until auth resolves
 document.getElementById('appTopbar').style.display = 'none';
 document.getElementById('appLayout').style.display = 'none';
+
+// Convert email-safe query params (?sign=ID) to hash format (#sign/ID)
+(function convertQueryToHash() {
+    const params = new URLSearchParams(window.location.search);
+    const signId = params.get('sign') || params.get('fill') || params.get('share');
+    const type = params.get('sign') ? 'sign' : params.get('fill') ? 'fill' : params.get('share') ? 'share' : null;
+    if (signId && type) {
+        window.location.replace(`${location.pathname}#${type}/${signId}`);
+    }
+})();
 
 // For sign/share links: show content immediately without waiting for auth
 const _initHash = window.location.hash;

@@ -67,6 +67,9 @@ class SmoovSDK {
      * @param {Object[]} opts.fields - Array of field definitions (see below)
      * @param {string} [opts.expiresAt] - ISO date string for expiration
      * @param {string} [opts.createdBy] - Creator email
+     * @param {Object} [opts.prefillData] - Pre-filled data for the recipient (shown read-only on the form)
+     * @param {string} [opts.webhookUrl] - Google Apps Script URL to POST completed form data to
+     * @param {Object} [opts.webhookMeta] - Extra metadata to include in webhook payload (e.g. { sheetId, project })
      * @returns {Promise<{id: string, signUrl: string, doc: Object}>}
      *
      * Field definition:
@@ -116,6 +119,9 @@ class SmoovSDK {
             createdBy: opts.createdBy || 'sdk',
             ownerUid: opts.ownerUid || '',
             expiresAt: opts.expiresAt || null,
+            prefillData: opts.prefillData || null,
+            webhookUrl: opts.webhookUrl || null,
+            webhookMeta: opts.webhookMeta || null,
             _fromSDK: true,
             audit: [
                 { action: 'created', time: now, detail: 'נוצר דרך SDK' },
@@ -174,6 +180,76 @@ class SmoovSDK {
             ...result,
             fillUrl: `${this._appUrl}#fill/${templateId}`
         };
+    }
+
+    /**
+     * Create personalized links for multiple recipients (batch).
+     * Each recipient gets their own document with pre-filled data.
+     *
+     * @param {Object} opts
+     * @param {string} opts.fileName - Document name
+     * @param {string} [opts.docImage] - Base64 document image
+     * @param {string[]} [opts.docPages] - Multi-page images
+     * @param {Object[]} opts.fields - Field definitions (same for all recipients)
+     * @param {string} [opts.webhookUrl] - Google Apps Script webhook URL
+     * @param {Object} [opts.webhookMeta] - Extra metadata for webhook
+     * @param {string} [opts.createdBy] - Creator email
+     * @param {Object[]} opts.people - Array of { name, phone?, email?, data: { key: value } }
+     *   data keys map to field labels for pre-filling
+     * @returns {Promise<Array<{name: string, id: string, signUrl: string}>>}
+     *
+     * Example:
+     *   await smoov.createPersonalLinks({
+     *     fileName: 'שאלון נשקים',
+     *     docImage: '...',
+     *     fields: [
+     *       { type: 'text', label: 'שם פרטי', x: 100, y: 100, w: 200, h: 40 },
+     *       { type: 'signature', label: 'חתימה', x: 100, y: 200, w: 200, h: 60 }
+     *     ],
+     *     webhookUrl: 'https://script.google.com/macros/s/.../exec',
+     *     people: [
+     *       { name: 'ישראל כהן', phone: '0541234567', data: { 'שם פרטי': 'ישראל' } },
+     *       { name: 'דוד לוי', phone: '0509876543', data: { 'שם פרטי': 'דוד' } }
+     *     ]
+     *   });
+     */
+    async createPersonalLinks(opts) {
+        this._ensureReady();
+        const results = [];
+        for (const person of (opts.people || [])) {
+            // Pre-fill field values from person.data
+            const fields = (opts.fields || []).map(f => {
+                const prefillValue = person.data && person.data[f.label];
+                return {
+                    ...f,
+                    signedValue: prefillValue || '',
+                    _prefilled: !!prefillValue
+                };
+            });
+
+            const result = await this.createDocument({
+                fileName: opts.fileName,
+                docImage: opts.docImage,
+                docPages: opts.docPages || [],
+                pageHeights: opts.pageHeights || [],
+                pageWidth: opts.pageWidth || 800,
+                fields,
+                recipients: [{ name: person.name, phone: person.phone || '', email: person.email || '' }],
+                createdBy: opts.createdBy || 'sdk',
+                prefillData: person.data || {},
+                webhookUrl: opts.webhookUrl || null,
+                webhookMeta: opts.webhookMeta || null,
+                expiresAt: opts.expiresAt || null
+            });
+
+            results.push({
+                name: person.name,
+                phone: person.phone || '',
+                id: result.id,
+                signUrl: result.signUrl
+            });
+        }
+        return results;
     }
 
     // ==================== Document Status ====================
