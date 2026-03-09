@@ -338,7 +338,8 @@ async function firebaseDeleteTemplate(tplId) {
 const FULL_ACCESS_EMAILS = [
     'elchaifinn@gmail.com',
     'office.liatfine@gmail.com',
-    'sodot.ahava@gmail.com'
+    'sodot.ahava@gmail.com',
+    'gdud1875idf@gmail.com'
 ];
 
 async function ensureUserProfile(user) {
