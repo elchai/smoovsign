@@ -403,12 +403,18 @@ function renderHome(el) {
         <div style="margin-bottom:24px;">
             <h2 style="font-size:1.15em;font-weight:700;margin-bottom:14px;">שליחת מסמך</h2>
             <div style="display:flex;gap:14px;flex-wrap:wrap;">
-                ${DM.templates.slice(0, 4).map(t => `
-                    <div class="template-quick-card" onclick="useTemplate('${t.id}')">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                ${DM.templates.slice(0, 4).map(t => {
+                    const isFormTpl = t.type === 'form';
+                    const clickFn = isFormTpl ? `createFromFormTemplate('${t.id}')` : `useTemplate('${t.id}')`;
+                    const icon = isFormTpl
+                        ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 8h4"/><path d="M14 12h4"/><path d="M14 16h4"/></svg>'
+                        : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+                    return `
+                    <div class="template-quick-card" onclick="${clickFn}">
+                        ${icon}
                         <span style="font-size:0.82em;font-weight:600;margin-top:6px;">${esc(t.name || 'תבנית')}</span>
-                    </div>
-                `).join('')}
+                    </div>`;
+                }).join('')}
                 <div class="template-quick-card" onclick="newDocument()" style="border:2px dashed var(--border);">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span style="font-size:0.82em;font-weight:600;margin-top:6px;">העלאת מסמך</span>
@@ -507,6 +513,8 @@ function renderDocRows(docs, mode) {
         const created = doc.createdAt ? new Date(doc.createdAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
         const rcptName = (doc.recipients || [])[0]?.name || '';
         const rcptInitials = rcptName ? rcptName.split(' ').map(w => w[0]).join('').substring(0, 2) : '?';
+        const isForm = doc.type === 'form';
+        const formIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 8h4"/><path d="M14 12h4"/><path d="M14 16h4"/></svg>';
 
         const isSelected = DM._selectedDocs.includes(doc.id);
         return `<div class="doc-table-row ${isSelected ? 'selected' : ''}" onclick="openSign('${doc.id}')">
@@ -514,9 +522,15 @@ function renderDocRows(docs, mode) {
                 <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleDocSelect('${doc.id}')">
             </div>
             <div class="dtc dtc-name">
-                <div>
-                    <div style="font-weight:600;font-size:0.9em;">${esc(doc.fileName || 'מסמך ללא שם')}</div>
-                    <div style="font-size:0.75em;color:var(--text-light);">${created}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    ${isForm ? `<span style="color:var(--success);flex-shrink:0;" title="טופס">${formIcon}</span>` : ''}
+                    <div>
+                        <div style="font-weight:600;font-size:0.9em;display:flex;align-items:center;gap:6px;">
+                            ${esc(doc.fileName || 'מסמך ללא שם')}
+                            ${isForm ? '<span class="badge badge-form" style="background:#d1fae5;color:#065f46;font-size:0.7em;padding:1px 6px;border-radius:4px;">טופס</span>' : ''}
+                        </div>
+                        <div style="font-size:0.75em;color:var(--text-light);">${created}</div>
+                    </div>
                 </div>
             </div>
             <div class="dtc dtc-rcpt">
@@ -532,8 +546,9 @@ function renderDocRows(docs, mode) {
             </div>
             <div class="dtc dtc-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-ghost btn-sm" onclick="openSign('${doc.id}')" title="צפייה">${ICO.eye}</button>
-                <button class="btn btn-ghost btn-sm" onclick="downloadSignedPDF('${doc.id}')" title="הורדה">${ICO.download}</button>
+                <button class="btn btn-ghost btn-sm" onclick="${isForm ? 'downloadFormPDF' : 'downloadSignedPDF'}('${doc.id}')" title="הורדה">${ICO.download}</button>
                 <button class="btn btn-ghost btn-sm" onclick="openShareModal('${doc.id}')" title="שיתוף">${ICO.share}</button>
+                ${isForm && mode !== 'deleted' ? `<button class="btn btn-ghost btn-sm" onclick="saveFormAsTemplate('${doc.id}')" title="שמור כתבנית"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></button>` : ''}
                 ${mode !== 'deleted' ? `<button class="btn btn-ghost btn-sm" onclick="deleteDoc('${doc.id}')" title="מחיקה" style="color:var(--danger);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>` : ''}
                 ${mode === 'waiting' ? `<button class="btn btn-primary btn-sm" onclick="openSign('${doc.id}')">מילוי טופס</button>` : ''}
                 ${mode === 'deleted' ? `<button class="btn btn-outline btn-sm" onclick="restoreDoc('${doc.id}')">שחזור</button>` : ''}
@@ -756,6 +771,7 @@ if (!DM._tplSelected) DM._tplSelected = {};
 function renderTemplates(el) {
     const selCount = Object.values(DM._tplSelected).filter(Boolean).length;
     const allSelected = DM.templates.length > 0 && selCount === DM.templates.length;
+    const formIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 8h4"/><path d="M14 12h4"/><path d="M14 16h4"/></svg>';
     el.innerHTML = `<div class="dashboard">
         <div class="dashboard-header">
             <h1>תבניות מסמכים</h1>
@@ -776,25 +792,34 @@ function renderTemplates(el) {
                 <input type="checkbox" id="tplSelectAll" ${allSelected ? 'checked' : ''} onchange="toggleAllTemplates(this.checked)" style="width:18px;height:18px;cursor:pointer;">
                 <label for="tplSelectAll" style="font-size:0.82em;color:var(--text-light);cursor:pointer;">בחר הכל</label>
             </div>
-            <div class="doc-list">${DM.templates.map(t => `
+            <div class="doc-list">${DM.templates.map(t => {
+                const isFormTpl = t.type === 'form';
+                const fieldCount = isFormTpl ? (t.formFields || []).length : (t.fields ? t.fields.length : 0);
+                return `
             <div class="template-card" style="${DM._tplSelected[t.id] ? 'background:var(--primary-light);' : ''}">
                 <input type="checkbox" ${DM._tplSelected[t.id] ? 'checked' : ''} onchange="toggleTemplateSelect('${t.id}', this.checked)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;">
-                <div class="template-icon" style="background:var(--primary-light);color:var(--primary);">${ICO.doc}</div>
+                <div class="template-icon" style="background:${isFormTpl ? '#d1fae5' : 'var(--primary-light)'};color:${isFormTpl ? '#065f46' : 'var(--primary)'};">${isFormTpl ? formIcon : ICO.doc}</div>
                 <div class="doc-info">
-                    <h3>${esc(t.name || 'תבנית ללא שם')}</h3>
-                    <div class="doc-meta">${t.fields ? t.fields.length + ' שדות' : ''} · ${t.fixedFields ? t.fixedFields.filter(f => f.value).length + ' שדות מוכנים' : ''}</div>
+                    <h3 style="display:flex;align-items:center;gap:6px;">
+                        ${esc(t.name || 'תבנית ללא שם')}
+                        ${isFormTpl ? '<span style="background:#d1fae5;color:#065f46;font-size:0.7em;padding:1px 6px;border-radius:4px;">טופס</span>' : ''}
+                    </h3>
+                    <div class="doc-meta">${fieldCount} שדות${!isFormTpl && t.fixedFields ? ' · ' + t.fixedFields.filter(f => f.value).length + ' שדות מוכנים' : ''}</div>
                 </div>
                 <div class="doc-actions">
-                    <button class="btn btn-sm btn-primary" onclick="useTemplate('${t.id}')">שלח מתבנית</button>
-                    <button class="btn btn-sm btn-outline" onclick="copyTemplateFillLink(this,'${t.id}')">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-                        קישור
-                    </button>
-                    <button class="btn btn-sm btn-outline" onclick="editTemplate('${t.id}')">ערוך</button>
+                    ${isFormTpl
+                        ? `<button class="btn btn-sm btn-primary" onclick="createFromFormTemplate('${t.id}')">צור טופס מתבנית</button>
+                           <button class="btn btn-sm btn-outline" onclick="editFormTemplate('${t.id}')">ערוך תבנית</button>`
+                        : `<button class="btn btn-sm btn-primary" onclick="useTemplate('${t.id}')">שלח מתבנית</button>
+                           <button class="btn btn-sm btn-outline" onclick="copyTemplateFillLink(this,'${t.id}')">
+                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                               קישור
+                           </button>
+                           <button class="btn btn-sm btn-outline" onclick="editTemplate('${t.id}')">ערוך</button>`}
                     <button class="btn btn-sm btn-ghost" style="color:var(--danger)" onclick="deleteTemplate('${t.id}')">מחק</button>
                 </div>
-            </div>
-        `).join('')}</div>`}
+            </div>`;
+            }).join('')}</div>`}
     </div>`;
 }
 
@@ -907,6 +932,9 @@ function resetEditor() {
     DM._isFormBuilder = false;
     DM._formSheetsUrl = '';
     DM._formMakeUrl = '';
+    DM._editingFormTemplateId = null;
+    DM._fromFormTemplate = false;
+    DM._formTemplateId = null;
 }
 
 // ==================== WIZARD ====================
@@ -5392,10 +5420,11 @@ function renderFormBuilder(el) {
         { id: 3, label: 'שליחה' }
     ];
 
+    const isEditingTpl = !!DM._editingFormTemplateId;
     el.innerHTML = `<div class="wizard">
         <div class="wizard-header">
             <button class="btn btn-ghost" onclick="resetEditor();switchView('home')">✕ סגור</button>
-            <span style="font-weight:700;">יצירת טופס חדש</span>
+            <span style="font-weight:700;">${isEditingTpl ? 'עריכת תבנית טופס' : 'יצירת טופס חדש'}</span>
             <div style="width:80px;"></div>
         </div>
         <div class="wizard-stepper">
@@ -5428,9 +5457,15 @@ function goFormStep(s) {
 function renderFormNextBtn() {
     const el = document.getElementById('wizardNextBtn');
     if (!el) return;
+    const isEditingTpl = !!DM._editingFormTemplateId;
     if (DM.step < 3) {
-        const disabled = DM.step === 1 && !DM.formTitle.trim() ? 'disabled' : '';
-        el.innerHTML = `<button class="btn btn-primary btn-lg" onclick="goFormStep(${DM.step + 1})" ${disabled}>הבא</button>`;
+        // When editing a template, skip step 3 (send) — save directly from step 2
+        if (isEditingTpl && DM.step === 2) {
+            el.innerHTML = `<button class="btn btn-success btn-lg" onclick="saveEditedFormTemplate()">שמור תבנית</button>`;
+        } else {
+            const disabled = DM.step === 1 && !DM.formTitle.trim() ? 'disabled' : '';
+            el.innerHTML = `<button class="btn btn-primary btn-lg" onclick="goFormStep(${DM.step + 1})" ${disabled}>הבא</button>`;
+        }
     } else {
         el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendForm()">שלח טופס</button>`;
     }
@@ -5685,6 +5720,13 @@ function renderFormSend(el) {
                         <small style="font-size:0.75em;color:var(--text-muted);margin-top:4px;display:block;">הפעלת אוטומציה עם מילוי הטופס</small>
                     </div>
                 </div>
+                <div class="form-group" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="formSaveAsTemplate" style="width:18px;height:18px;">
+                        <span style="font-size:0.88em;font-weight:600;">שמור גם כתבנית לשימוש חוזר</span>
+                    </label>
+                    <small style="font-size:0.75em;color:var(--text-muted);margin-top:4px;display:block;margin-right:26px;">הטופס יישמר כתבנית שתוכל לשלוח שוב בעתיד</small>
+                </div>
             </div>
         </div>
     </div>`;
@@ -5717,6 +5759,13 @@ function sendForm() {
     };
 
     DM.docs.push(doc);
+
+    // Save as template if checkbox is checked
+    const saveAsTpl = document.getElementById('formSaveAsTemplate')?.checked;
+    if (saveAsTpl) {
+        _saveFormDocAsTemplate(doc);
+    }
+
     save();
 
     // Save to Firebase
@@ -5744,6 +5793,93 @@ function sendForm() {
     toast('הטופס נוצר בהצלחה!');
     resetEditor();
     showLinkSuccess(doc);
+}
+
+// ==================== Form Templates ====================
+
+function _saveFormDocAsTemplate(doc) {
+    const tpl = {
+        id: 'tpl_' + Date.now(),
+        type: 'form',
+        isTemplate: true,
+        name: doc.formTitle || doc.fileName,
+        formTitle: doc.formTitle,
+        formDescription: doc.formDescription || '',
+        formLogo: doc.formLogo || null,
+        formFields: JSON.parse(JSON.stringify(doc.formFields || [])),
+        createdAt: new Date().toISOString(),
+        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.email) || '',
+        ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser && smoovCurrentUser.uid) || ''
+    };
+    DM.templates.push(tpl);
+    if (typeof firebaseSaveTemplate === 'function') firebaseSaveTemplate(tpl);
+    return tpl;
+}
+
+function saveFormAsTemplate(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc || doc.type !== 'form') { toast('הטופס לא נמצא', 'error'); return; }
+    _saveFormDocAsTemplate(doc);
+    save();
+    toast('הטופס נשמר כתבנית!');
+    render();
+}
+
+function createFromFormTemplate(tplId) {
+    const tpl = DM.templates.find(t => t.id === tplId);
+    if (!tpl) { toast('התבנית לא נמצאה', 'error'); return; }
+    // Start form builder with cloned template data
+    DM.step = 1;
+    DM.formTitle = tpl.formTitle || tpl.name || '';
+    DM.formDescription = tpl.formDescription || '';
+    DM.formLogo = tpl.formLogo || null;
+    DM.formFields = JSON.parse(JSON.stringify(tpl.formFields || []));
+    // Give each field a new unique ID
+    DM.formFields.forEach(f => { f.id = Date.now() + '_' + Math.random().toString(36).substr(2, 6); });
+    DM.recipients = [];
+    DM.isTemplate = false;
+    DM._isFormBuilder = true;
+    DM._formSheetsUrl = '';
+    DM._formMakeUrl = '';
+    DM._fromFormTemplate = true;
+    DM._formTemplateId = tplId;
+    switchView('create_form');
+}
+
+function editFormTemplate(tplId) {
+    const tpl = DM.templates.find(t => t.id === tplId);
+    if (!tpl) { toast('התבנית לא נמצאה', 'error'); return; }
+    // Start form builder with template data for editing
+    DM.step = 1;
+    DM.formTitle = tpl.formTitle || tpl.name || '';
+    DM.formDescription = tpl.formDescription || '';
+    DM.formLogo = tpl.formLogo || null;
+    DM.formFields = JSON.parse(JSON.stringify(tpl.formFields || []));
+    DM.recipients = [];
+    DM.isTemplate = false;
+    DM._isFormBuilder = true;
+    DM._formSheetsUrl = '';
+    DM._formMakeUrl = '';
+    DM._editingFormTemplateId = tplId;
+    switchView('create_form');
+}
+
+function saveEditedFormTemplate() {
+    if (!DM.formTitle.trim()) { toast('יש להזין כותרת לטופס', 'error'); return; }
+    if (DM.formFields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    const idx = DM.templates.findIndex(t => t.id === DM._editingFormTemplateId);
+    if (idx < 0) { toast('התבנית לא נמצאה', 'error'); return; }
+    const tpl = DM.templates[idx];
+    tpl.name = DM.formTitle;
+    tpl.formTitle = DM.formTitle;
+    tpl.formDescription = DM.formDescription || '';
+    tpl.formLogo = DM.formLogo || null;
+    tpl.formFields = JSON.parse(JSON.stringify(DM.formFields));
+    save();
+    if (typeof firebaseSaveTemplate === 'function') firebaseSaveTemplate(tpl);
+    toast('התבנית עודכנה בהצלחה!');
+    resetEditor();
+    switchView('templates');
 }
 
 // Migrate images from localStorage to IndexedDB (one-time on upgrade)
