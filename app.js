@@ -2366,6 +2366,35 @@ async function openSign(docId, opts = {}) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { toast('המסמך לא נמצא', 'error'); switchView('home'); return; }
 
+    // Form-type docs don't need image loading
+    if (doc.type === 'form') {
+        const isSignLink = location.hash.startsWith('#sign/');
+        const isLoggedIn = !!(typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser);
+        if (isLoggedIn) {
+            const isOwner = (doc.ownerUid && doc.ownerUid === smoovCurrentUser.uid) || (!doc.ownerUid && doc.createdBy && doc.createdBy === smoovCurrentUser.email);
+            if (isOwner && !opts.keepSigner) {
+                DM._currentSigner = null;
+            } else if (!DM._currentSigner) {
+                DM._currentSigner = smoovCurrentUser.displayName || smoovCurrentUser.email || 'ממלא';
+                DM._currentSignerEmail = smoovCurrentUser.email || '';
+            }
+            DM.signDocId = docId;
+            DM.view = 'sign';
+            render();
+            return;
+        }
+        if (isSignLink && !DM._currentSigner && doc.status !== 'completed') {
+            DM.signDocId = docId;
+            DM.view = 'sign';
+            showSignerVerification(doc);
+            return;
+        }
+        DM.signDocId = docId;
+        DM.view = 'sign';
+        render();
+        return;
+    }
+
     // Ensure doc images are loaded (IDB first, then Firestore chunks)
     if (!doc.docImage) {
         const imgs = await idbLoadImages(docId);
@@ -2490,6 +2519,13 @@ function renderSignView(el) {
   try {
     const doc = DM.docs.find(d => d.id === DM.signDocId);
     if (!doc) { switchView('home'); return; }
+
+    // Form-type docs get a dedicated clean form view
+    if (doc.type === 'form') {
+        renderFormSignView(el, doc);
+        return;
+    }
+
     console.log('[sign] Rendering sign view:', { docId: doc.id, signer: DM._currentSigner, fields: (doc.fields||[]).length, hasImage: !!doc.docImage });
 
     const isSignerView = !!DM._currentSigner;
@@ -2913,6 +2949,8 @@ async function downloadSignedPDF(docId) {
     console.log('[PDF] downloadSignedPDF called:', docId);
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) { console.log('[PDF] doc not found'); toast('אין מסמך להורדה', 'error'); return; }
+    // Form-type docs use dedicated form PDF generator
+    if (doc.type === 'form') { downloadFormPDF(docId); return; }
 
     // Ensure images are loaded (may have been stripped from memory)
     if (!doc.docImage || (doc.pageHeights && doc.pageHeights.length > 1 && (!doc.docPages || doc.docPages.length < 2))) {
@@ -3936,6 +3974,661 @@ async function _fireWebhook(doc) {
     }
 }
 
+// ==================== FORM SIGN VIEW (Task 7-9) ====================
+
+function renderFormSignView(el, doc) {
+    if (!doc._formValues) doc._formValues = {};
+    const isSignerView = !!DM._currentSigner;
+    const isComplete = doc.status === 'completed';
+
+    // Signer completion screen
+    if (isComplete && isSignerView) {
+        el.innerHTML = `<div class="form-sign-container">
+            <div class="form-sign-card form-sign-success">
+                <div class="success-icon">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h2 style="font-size:1.5em;font-weight:800;color:var(--text);margin-bottom:8px;">הטופס הושלם בהצלחה!</h2>
+                <p style="color:var(--text-light);font-size:0.92em;margin-bottom:6px;">${esc(doc.formTitle || doc.fileName || 'טופס')}</p>
+                <p style="color:var(--text-muted);font-size:0.82em;margin-bottom:24px;">הושלם: ${doc.completedAt ? new Date(doc.completedAt).toLocaleString('he-IL') : ''}</p>
+                <button class="btn btn-primary btn-lg" onclick="downloadFormPDF('${doc.id}')" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;">
+                    ${ICO.download} הורד PDF
+                </button>
+                <div style="margin-top:28px;padding-top:24px;border-top:1px solid var(--border);">
+                    <div style="font-size:0.78em;color:var(--text-muted);">מערכת זו פותחה ע"י אלחי פיין <a href="https://www.daghazahav.com" target="_blank" style="color:var(--text-light);text-decoration:underline;">DAGHAZAHAV</a></div>
+                </div>
+            </div>
+        </div>`;
+        return;
+    }
+
+    // Owner view for completed form
+    if (isComplete && !isSignerView) {
+        el.innerHTML = `<div class="form-sign-container">
+            <div class="form-sign-card">
+                ${doc.formLogo ? `<div class="form-sign-logo"><img src="${esc(doc.formLogo)}" alt="לוגו"></div>` : ''}
+                <div class="form-sign-title">${esc(doc.formTitle || doc.fileName || 'טופס')}</div>
+                <div style="text-align:center;margin:16px 0;">
+                    <span style="background:var(--success-light);color:var(--success);padding:6px 16px;border-radius:20px;font-size:0.88em;font-weight:600;">הושלם</span>
+                </div>
+                <div class="form-sign-fields">
+                    ${(doc.formFields || []).map((f, idx) => renderFormSignField(f, idx, doc._formValues[f.id], doc, true)).join('')}
+                </div>
+                <div style="display:flex;gap:8px;margin-top:24px;justify-content:center;">
+                    <button class="btn btn-outline" onclick="switchView('home')">חזרה</button>
+                    <button class="btn btn-primary" onclick="downloadFormPDF('${doc.id}')">${ICO.download} הורד PDF</button>
+                </div>
+            </div>
+        </div>`;
+        return;
+    }
+
+    // Owner view - waiting for fill
+    if (!isSignerView && !isComplete) {
+        el.innerHTML = `<div class="form-sign-container">
+            <div class="form-sign-card">
+                ${doc.formLogo ? `<div class="form-sign-logo"><img src="${esc(doc.formLogo)}" alt="לוגו"></div>` : ''}
+                <div class="form-sign-title">${esc(doc.formTitle || doc.fileName || 'טופס')}</div>
+                ${doc.formDescription ? `<div class="form-sign-desc">${esc(doc.formDescription)}</div>` : ''}
+                <div style="text-align:center;margin:24px 0;">
+                    <span style="background:var(--warning-light);color:var(--warning);padding:8px 20px;border-radius:20px;font-size:0.92em;font-weight:600;">ממתין למילוי</span>
+                </div>
+                <div class="form-sign-fields" style="opacity:0.6;pointer-events:none;">
+                    ${(doc.formFields || []).map((f, idx) => renderFormSignField(f, idx, null, doc, true)).join('')}
+                </div>
+                <div style="text-align:center;margin-top:24px;">
+                    <button class="btn btn-outline" onclick="switchView('home')">חזרה</button>
+                </div>
+            </div>
+        </div>`;
+        return;
+    }
+
+    // Signer view - active form
+    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', `${DM._currentSigner} צפה בטופס`); save(); syncDocToFirebase(doc); }
+
+    el.innerHTML = `<div class="form-sign-container">
+        <div class="form-sign-card">
+            ${doc.formLogo ? `<div class="form-sign-logo"><img src="${esc(doc.formLogo)}" alt="לוגו"></div>` : ''}
+            <div class="form-sign-title">${esc(doc.formTitle || doc.fileName || 'טופס')}</div>
+            ${doc.formDescription ? `<div class="form-sign-desc">${esc(doc.formDescription)}</div>` : ''}
+            <div class="form-sign-fields">
+                ${(doc.formFields || []).map((f, idx) => renderFormSignField(f, idx, doc._formValues[f.id], doc, false)).join('')}
+            </div>
+            <button class="form-sign-submit" onclick="submitForm('${doc.id}')">שלח טופס</button>
+            <div style="text-align:center;margin-top:16px;">
+                <span style="font-size:0.78em;color:var(--text-muted);">מופעל ע"י <a href="https://www.daghazahav.com" target="_blank" style="color:var(--text-light);text-decoration:underline;">SmoovSign</a></span>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderFormSignField(f, idx, val, doc, readonly) {
+    if (f.type === 'heading') {
+        return `<div class="fs-heading">${esc(f.label || f.content || '')}</div>`;
+    }
+    if (f.type === 'paragraph') {
+        return `<div class="fs-paragraph">${esc(f.content || f.label || '')}</div>`;
+    }
+
+    const req = f.required ? '<span class="fs-required">*</span>' : '';
+    const disabledAttr = readonly ? 'disabled' : '';
+    const valStr = val != null ? val : '';
+
+    if (f.type === 'checkbox') {
+        const checked = valStr ? 'checked' : '';
+        return `<div class="fs-field">
+            <label class="fs-checkbox">
+                <input type="checkbox" ${checked} ${disabledAttr} onchange="updateFormValue('${doc.id}','${f.id}',this.checked)">
+                <span class="fs-label">${esc(f.label || '')}${req}</span>
+            </label>
+        </div>`;
+    }
+
+    if (f.type === 'dropdown') {
+        const opts = (f.options || []).map(o => `<option value="${esc(o)}" ${valStr === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+        return `<div class="fs-field">
+            <label class="fs-label">${esc(f.label || '')}${req}</label>
+            <select class="fs-select" ${disabledAttr} onchange="updateFormValue('${doc.id}','${f.id}',this.value)">
+                <option value="">${esc(f.placeholder || 'בחר...')}</option>
+                ${opts}
+            </select>
+        </div>`;
+    }
+
+    if (f.type === 'signature') {
+        const hasSig = valStr && typeof valStr === 'string' && valStr.startsWith('data:');
+        return `<div class="fs-field">
+            <label class="fs-label">${esc(f.label || 'חתימה')}${req}</label>
+            <div class="fs-signature-area" ${readonly ? '' : `onclick="openFormSignature('${doc.id}','${f.id}')"`}>
+                ${hasSig
+                    ? `<img src="${valStr}" alt="חתימה" style="max-height:60px;">`
+                    : `<span style="color:var(--text-muted);font-size:0.88em;">${readonly ? '' : 'לחץ לחתימה'}</span>`
+                }
+            </div>
+        </div>`;
+    }
+
+    if (f.type === 'file') {
+        const hasFile = valStr && typeof valStr === 'string' && valStr.length > 0;
+        return `<div class="fs-field">
+            <label class="fs-label">${esc(f.label || 'קובץ')}${req}</label>
+            ${hasFile
+                ? `<div class="fs-file-area" style="border-style:solid;border-color:var(--success);color:var(--success);font-size:0.88em;">קובץ צורף</div>`
+                : `<div class="fs-file-area" ${readonly ? '' : `onclick="document.getElementById('ff_${f.id}').click()"`}>
+                    <span style="color:var(--text-muted);font-size:0.88em;">${readonly ? '' : 'לחץ לצירוף קובץ'}</span>
+                    ${readonly ? '' : `<input type="file" id="ff_${f.id}" style="display:none;" onchange="uploadFormFile('${doc.id}','${f.id}',this)">`}
+                </div>`
+            }
+        </div>`;
+    }
+
+    // Text-based inputs
+    let inputType = 'text';
+    if (f.type === 'number') inputType = 'number';
+    else if (f.type === 'date') inputType = 'date';
+
+    let placeholder = f.placeholder || '';
+    if (!placeholder) {
+        if (f.type === 'fullname') placeholder = 'שם מלא';
+        else if (f.type === 'id_number') placeholder = 'תעודת זהות';
+        else if (f.type === 'text') placeholder = 'הזן טקסט...';
+        else if (f.type === 'number') placeholder = '0';
+    }
+
+    return `<div class="fs-field">
+        <label class="fs-label">${esc(f.label || '')}${req}</label>
+        <input type="${inputType}" class="fs-input" value="${esc(valStr)}" placeholder="${esc(placeholder)}" ${disabledAttr}
+            onchange="updateFormValue('${doc.id}','${f.id}',this.value)"
+            oninput="updateFormValue('${doc.id}','${f.id}',this.value)">
+    </div>`;
+}
+
+function updateFormValue(docId, fieldId, value) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) return;
+    if (!doc._formValues) doc._formValues = {};
+    doc._formValues[fieldId] = value;
+}
+
+function openFormSignature(docId, fieldId) {
+    window._formSignDocId = docId;
+    window._formSignFieldId = fieldId;
+    window._signActiveTab = 'draw';
+    window._signUploadData = null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'signModal';
+    overlay.innerHTML = `<div class="modal-card" style="width:500px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="font-weight:700;margin:0;">חתימה דיגיטלית</h3>
+            <button class="btn btn-ghost btn-sm" onclick="cancelSignCanvas()" style="font-size:1.1em;">x</button>
+        </div>
+        <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">חתום בתוך המסגרת:</p>
+        <canvas id="signCanvas" class="sign-canvas" width="800" height="360" style="width:100%;max-width:460px;height:180px;border:2px solid var(--border);border-radius:8px;background:white;touch-action:none;"></canvas>
+        <div style="display:flex;gap:6px;margin-top:6px;justify-content:center;">
+            <button class="btn btn-ghost btn-sm" onclick="clearSignCanvas()" style="font-size:0.78em;">נקה</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="cancelSignCanvas()">ביטול</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmFormSignature()">אשר חתימה</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.onclick = e => { if (e.target === overlay) cancelSignCanvas(); };
+
+    // Setup canvas
+    const canvas = document.getElementById('signCanvas');
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#2563eb';
+
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    function getPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+        drawing = true;
+        const p = getPos(e);
+        lastX = p.x; lastY = p.y;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+    });
+    canvas.addEventListener('pointermove', e => {
+        if (!drawing) return;
+        e.preventDefault();
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        lastX = p.x; lastY = p.y;
+    });
+    canvas.addEventListener('pointerup', () => { drawing = false; });
+    canvas.addEventListener('pointerleave', () => { drawing = false; });
+}
+
+function confirmFormSignature() {
+    const canvas = document.getElementById('signCanvas');
+    if (!canvas) return;
+    const docId = window._formSignDocId;
+    const fieldId = window._formSignFieldId;
+    if (!docId || !fieldId) return;
+
+    // Check if canvas has content
+    const ctx = canvas.getContext('2d');
+    const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let hasContent = false;
+    for (let i = 3; i < px.length; i += 4) {
+        if (px[i] > 0) { hasContent = true; break; }
+    }
+    if (!hasContent) { toast('נא לחתום לפני אישור', 'error'); return; }
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const doc = DM.docs.find(d => d.id === docId);
+    if (doc) {
+        if (!doc._formValues) doc._formValues = {};
+        doc._formValues[fieldId] = dataUrl;
+    }
+
+    // Close modal
+    const modal = document.getElementById('signModal');
+    if (modal) modal.remove();
+    window._formSignDocId = null;
+    window._formSignFieldId = null;
+
+    render();
+}
+
+function uploadFormFile(docId, fieldId, input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) { toast('הקובץ גדול מדי (מקסימום 5MB)', 'error'); return; }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        const doc = DM.docs.find(d => d.id === docId);
+        if (doc) {
+            if (!doc._formValues) doc._formValues = {};
+            doc._formValues[fieldId] = reader.result;
+        }
+        render();
+    };
+    reader.readAsDataURL(file);
+}
+
+// ==================== Task 8: Form Submission + Auto PDF ====================
+
+function submitForm(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) { toast('הטופס לא נמצא', 'error'); return; }
+    if (!doc._formValues) doc._formValues = {};
+
+    // Validate required fields
+    const missingFields = [];
+    (doc.formFields || []).forEach(f => {
+        if (f.type === 'heading' || f.type === 'paragraph') return;
+        if (!f.required) return;
+        const val = doc._formValues[f.id];
+        if (!val || (typeof val === 'string' && !val.trim()) || val === false) {
+            missingFields.push(f.label || f.type);
+        }
+    });
+    if (missingFields.length > 0) {
+        toast(`נותרו ${missingFields.length} שדות חובה: ${missingFields.slice(0, 3).join(', ')}${missingFields.length > 3 ? '...' : ''}`, 'error');
+        return;
+    }
+
+    // Store values in doc.fields for webhook compatibility
+    doc.fields = (doc.formFields || []).filter(f => f.type !== 'heading' && f.type !== 'paragraph').map(f => {
+        const val = doc._formValues[f.id];
+        const entry = {
+            id: f.id,
+            type: f.type,
+            label: f.label || f.type,
+            signedValue: (f.type === 'checkbox') ? (val ? 'V' : '') : (typeof val === 'string' ? val : String(val || ''))
+        };
+        if (f.type === 'signature' && val && typeof val === 'string' && val.startsWith('data:')) {
+            entry.signatureData = val;
+            entry.signedValue = 'חתום';
+        }
+        if (f.type === 'file' && val && typeof val === 'string' && val.startsWith('data:')) {
+            entry.fileData = val;
+            entry.signedValue = 'קובץ צורף';
+        }
+        return entry;
+    });
+
+    // Mark signer recipient as signed
+    const isSignerView = !!DM._currentSigner;
+    if (isSignerView) {
+        let signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
+        if (!signerRecipient) {
+            signerRecipient = (doc.recipients || []).find(r => !r.signed);
+        }
+        if (!signerRecipient) {
+            // Create recipient from signer info
+            signerRecipient = {
+                id: Date.now(),
+                name: DM._currentSigner || 'ממלא',
+                phone: '',
+                email: DM._currentSignerEmail || '',
+                colorIndex: 0,
+                type: 'signer',
+                signed: false
+            };
+            doc.recipients = doc.recipients || [];
+            doc.recipients.push(signerRecipient);
+        }
+        signerRecipient.signed = true;
+        signerRecipient.signedAt = new Date().toISOString();
+        if (DM._currentSigner) signerRecipient.name = DM._currentSigner;
+        addAudit(doc, 'signed', `${DM._currentSigner} מילא/ה את הטופס`);
+    }
+
+    // Check if all recipients signed
+    const allSigned = (doc.recipients || []).length === 0 || (doc.recipients || []).every(r => r.signed);
+    if (allSigned) {
+        doc.status = 'completed';
+        doc.completedAt = new Date().toISOString();
+        addAudit(doc, 'completed', 'הטופס הושלם');
+    }
+
+    save();
+    syncDocToFirebase(doc);
+
+    // Trigger integrations on completion
+    if (doc.status === 'completed') {
+        triggerFormIntegrations(doc);
+    }
+
+    toast('הטופס נשלח בהצלחה!');
+
+    // Email notifications
+    if (typeof emailNotifyOwner === 'function') {
+        const sName = isSignerView ? DM._currentSigner : 'בעל הטופס';
+        const totalF = (doc.fields || []).length;
+        emailNotifyOwner(doc, sName, { filled: totalF, total: totalF, allDone: doc.status === 'completed' }).catch(() => {});
+    }
+    if (isSignerView && DM._currentSignerEmail && typeof emailNotifySigner === 'function') {
+        emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
+    }
+
+    render();
+}
+
+async function generateFormPDF(doc) {
+    // Load jsPDF if needed
+    const JSPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!JSPDF) {
+        // Try dynamic load
+        await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    }
+    const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!JsPDF) throw new Error('jsPDF not available');
+
+    const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    // Load Hebrew font support - use built-in with RTL workaround
+    const pageW = 210, pageH = 297;
+    const margin = 20;
+    let y = margin;
+
+    // Helper: add text right-aligned (RTL simulation)
+    function addRtlText(text, x, yPos, opts = {}) {
+        const size = opts.size || 10;
+        const style = opts.style || 'normal';
+        pdf.setFontSize(size);
+        // Reverse for basic RTL display
+        pdf.text(text, x, yPos, { align: opts.align || 'right' });
+    }
+
+    // Logo
+    if (doc.formLogo) {
+        try {
+            pdf.addImage(doc.formLogo, 'PNG', pageW / 2 - 20, y, 40, 20);
+            y += 25;
+        } catch (e) { /* skip logo */ }
+    }
+
+    // Title
+    pdf.setFontSize(18);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(doc.formTitle || doc.fileName || 'Form', pageW / 2, y, { align: 'center' });
+    y += 10;
+
+    // Description
+    if (doc.formDescription) {
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'normal');
+        pdf.setTextColor(100, 100, 100);
+        const descLines = pdf.splitTextToSize(doc.formDescription, pageW - margin * 2);
+        pdf.text(descLines, pageW / 2, y, { align: 'center' });
+        y += descLines.length * 5 + 5;
+        pdf.setTextColor(0, 0, 0);
+    }
+
+    // Separator
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, y, pageW - margin, y);
+    y += 8;
+
+    // Fields
+    const formValues = doc._formValues || {};
+    (doc.formFields || []).forEach(f => {
+        if (y > pageH - 30) {
+            pdf.addPage();
+            y = margin;
+        }
+
+        if (f.type === 'heading') {
+            pdf.setFontSize(13);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(f.label || f.content || '', pageW - margin, y, { align: 'right' });
+            y += 4;
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(margin, y, pageW - margin, y);
+            y += 6;
+            return;
+        }
+        if (f.type === 'paragraph') {
+            pdf.setFontSize(9);
+            pdf.setFont(undefined, 'normal');
+            pdf.setTextColor(120, 120, 120);
+            const lines = pdf.splitTextToSize(f.content || f.label || '', pageW - margin * 2);
+            pdf.text(lines, pageW - margin, y, { align: 'right' });
+            y += lines.length * 4 + 4;
+            pdf.setTextColor(0, 0, 0);
+            return;
+        }
+
+        // Label
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'bold');
+        pdf.text((f.label || f.type) + ':', pageW - margin, y, { align: 'right' });
+        y += 5;
+
+        // Value
+        const val = formValues[f.id];
+        pdf.setFont(undefined, 'normal');
+        pdf.setFontSize(10);
+
+        if (f.type === 'signature' && val && typeof val === 'string' && val.startsWith('data:')) {
+            try {
+                pdf.addImage(val, 'PNG', pageW - margin - 50, y, 50, 20);
+                y += 24;
+            } catch (e) {
+                pdf.text('[signature]', pageW - margin, y, { align: 'right' });
+                y += 6;
+            }
+        } else if (f.type === 'checkbox') {
+            pdf.text(val ? 'V' : '-', pageW - margin, y, { align: 'right' });
+            y += 6;
+        } else if (f.type === 'file' && val) {
+            pdf.text('[file attached]', pageW - margin, y, { align: 'right' });
+            y += 6;
+        } else {
+            const valText = (val != null && val !== '') ? String(val) : '-';
+            const valLines = pdf.splitTextToSize(valText, pageW - margin * 2);
+            pdf.text(valLines, pageW - margin, y, { align: 'right' });
+            y += valLines.length * 5 + 2;
+        }
+        y += 3;
+    });
+
+    // Completion info
+    if (doc.completedAt) {
+        if (y > pageH - 30) { pdf.addPage(); y = margin; }
+        y += 5;
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(margin, y, pageW - margin, y);
+        y += 8;
+        pdf.setFontSize(9);
+        pdf.setTextColor(120, 120, 120);
+        pdf.text('Completed: ' + new Date(doc.completedAt).toLocaleString('he-IL'), pageW - margin, y, { align: 'right' });
+        y += 5;
+    }
+
+    // Recipients info
+    if (doc.recipients && doc.recipients.length > 0) {
+        doc.recipients.forEach(r => {
+            if (y > pageH - 20) { pdf.addPage(); y = margin; }
+            const rInfo = `${r.name || ''} ${r.email ? '(' + r.email + ')' : ''} - ${r.signed ? 'signed ' + (r.signedAt ? new Date(r.signedAt).toLocaleString('he-IL') : '') : 'pending'}`;
+            pdf.setFontSize(8);
+            pdf.text(rInfo, pageW - margin, y, { align: 'right' });
+            y += 4;
+        });
+    }
+
+    // Footer
+    if (y > pageH - 15) { pdf.addPage(); y = margin; }
+    pdf.setFontSize(8);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('Created with SmoovSign - www.daghazahav.com', pageW / 2, pageH - 10, { align: 'center' });
+
+    return pdf;
+}
+
+async function downloadFormPDF(docId) {
+    const doc = DM.docs.find(d => d.id === docId);
+    if (!doc) { toast('הטופס לא נמצא', 'error'); return; }
+    toast('מכין PDF...', 'info');
+    try {
+        const pdf = await generateFormPDF(doc);
+        const fname = (doc.formTitle || doc.fileName || 'form').replace(/[^\u0590-\u05FFa-zA-Z0-9 _-]/g, '') + '.pdf';
+        pdf.save(fname);
+        toast('PDF הורד בהצלחה!');
+    } catch (err) {
+        console.error('[formPDF] Error:', err);
+        toast('שגיאה ביצירת PDF: ' + (err.message || err), 'error');
+    }
+}
+
+// ==================== Task 9: Form Integrations ====================
+
+function buildFormWebhookPayload(doc) {
+    const fieldsFlat = {};
+    (doc.formFields || []).forEach(f => {
+        if (f.type === 'heading' || f.type === 'paragraph') return;
+        const label = f.label || f.type || f.id;
+        const val = (doc._formValues || {})[f.id];
+        if (f.type === 'signature' && val && typeof val === 'string' && val.startsWith('data:')) {
+            fieldsFlat[label] = val;
+        } else if (f.type === 'file' && val && typeof val === 'string' && val.startsWith('data:')) {
+            fieldsFlat[label] = val;
+        } else if (f.type === 'checkbox') {
+            fieldsFlat[label] = val ? 'V' : '';
+        } else {
+            fieldsFlat[label] = val != null ? String(val) : '';
+        }
+    });
+
+    return {
+        event: 'form_completed',
+        docId: doc.id,
+        formTitle: doc.formTitle || doc.fileName || '',
+        fileName: doc.fileName || doc.formTitle || '',
+        completedAt: doc.completedAt || new Date().toISOString(),
+        signUrl: location.origin + location.pathname + '#sign/' + doc.id,
+        recipients: (doc.recipients || []).map(r => ({
+            name: r.name || '',
+            phone: r.phone || '',
+            email: r.email || '',
+            signed: !!r.signed,
+            signedAt: r.signedAt || ''
+        })),
+        fields: fieldsFlat,
+        meta: {
+            type: 'form',
+            createdBy: doc.createdBy || '',
+            source: 'SmoovSign'
+        }
+    };
+}
+
+async function triggerFormIntegrations(doc) {
+    const payload = buildFormWebhookPayload(doc);
+
+    // Google Sheets webhook (Apps Script - requires no-cors)
+    if (doc.webhookUrl) {
+        try {
+            console.log('[form-webhook] Sending to Google Sheets:', doc.webhookUrl);
+            await fetch(doc.webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(payload)
+            });
+            console.log('[form-webhook] Google Sheets sent');
+            addAudit(doc, 'webhook', 'נתוני הטופס נשלחו ל-Google Sheets');
+        } catch (err) {
+            console.error('[form-webhook] Google Sheets error:', err);
+            addAudit(doc, 'webhook_error', 'שגיאה בשליחת נתונים ל-Google Sheets: ' + (err.message || err));
+        }
+    }
+
+    // Make.com webhook (standard CORS)
+    if (doc.makeWebhookUrl) {
+        try {
+            console.log('[form-webhook] Sending to Make.com:', doc.makeWebhookUrl);
+            await fetch(doc.makeWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            console.log('[form-webhook] Make.com sent');
+            addAudit(doc, 'webhook', 'נתוני הטופס נשלחו ל-Make.com');
+        } catch (err) {
+            console.error('[form-webhook] Make.com error:', err);
+            addAudit(doc, 'webhook_error', 'שגיאה בשליחת נתונים ל-Make.com: ' + (err.message || err));
+        }
+    }
+
+    if (doc.webhookUrl || doc.makeWebhookUrl) {
+        save();
+        syncDocToFirebase(doc);
+    }
+}
+
 // ==================== SHARE DOCUMENT ====================
 function openShareModal(docId) {
     const doc = DM.docs.find(d => d.id === docId);
@@ -4859,12 +5552,7 @@ function renderFormFieldCard(f, idx) {
             <input type="text" class="form-input" style="font-size:0.82em;padding:6px 10px;" placeholder="טקסט עזרה (placeholder)" value="${esc(f.placeholder || '')}" oninput="DM.formFields[${idx}].placeholder=this.value">
         </div>`;
     }
-    // Content for heading/paragraph
-    if (f.type === 'heading') {
-        extra += `<div style="padding:4px 0 0 0;margin-top:4px;">
-            <input type="text" class="form-input" style="font-size:0.95em;font-weight:700;padding:6px 10px;" placeholder="טקסט הכותרת" value="${esc(f.content || '')}" oninput="DM.formFields[${idx}].content=this.value">
-        </div>`;
-    }
+    // Paragraph gets a multi-line content area (heading uses inline label)
     if (f.type === 'paragraph') {
         extra += `<div style="padding:4px 0 0 0;margin-top:4px;">
             <textarea class="form-input" style="font-size:0.85em;padding:6px 10px;resize:vertical;" rows="2" placeholder="טקסט הפסקה / הסבר" oninput="DM.formFields[${idx}].content=this.value">${esc(f.content || '')}</textarea>
@@ -4888,7 +5576,7 @@ function renderFormFieldCard(f, idx) {
         <div class="ff-card-header">
             <span class="ff-drag-handle" title="גרור לשינוי סדר">⠿</span>
             <span class="ff-type-icon">${icon}</span>
-            <input type="text" class="ff-label-input" value="${esc(f.label)}" oninput="DM.formFields[${idx}].label=this.value" placeholder="שם השדה">
+            <input type="text" class="ff-label-input" value="${esc(isDecorative ? (f.content || f.label) : f.label)}" oninput="${isDecorative ? `DM.formFields[${idx}].content=this.value;DM.formFields[${idx}].label=this.value` : `DM.formFields[${idx}].label=this.value`}" placeholder="${isDecorative ? 'הזן טקסט...' : 'שם השדה'}">
             ${!isDecorative ? `
                 <label class="ff-required-toggle">
                     <input type="checkbox" ${f.required ? 'checked' : ''} onchange="DM.formFields[${idx}].required=this.checked">
