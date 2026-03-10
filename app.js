@@ -27,6 +27,14 @@ const DM = {
     editingTemplateId: null,
     signDocId: null,
     recipientSearch: '',
+    // Form Builder state
+    formTitle: '',
+    formDescription: '',
+    formLogo: null,
+    formFields: [],
+    _isFormBuilder: false,
+    _formSheetsUrl: '',
+    _formMakeUrl: '',
     fieldColors: [
         { bg: '#dbeafe', border: '#2563eb', text: '#1d4ed8', fill: '#2563eb' },
         { bg: '#f3e8ff', border: '#7c3aed', text: '#6d28d9', fill: '#7c3aed' },
@@ -58,7 +66,26 @@ const ICO = {
     checkbox: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="9 11 12 14 22 4"/></svg>',
     share: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>',
     link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>',
+    dropdown: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 10 12 14 16 10"/></svg>',
+    heading: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4v16"/><path d="M18 4v16"/><path d="M6 12h12"/></svg>',
+    paragraph: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>',
+    number: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-12"/><path d="M14 17l6-12"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="2" y1="15" x2="22" y2="15"/></svg>',
+    text: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
 };
+
+const FORM_FIELD_TYPES = [
+    { type: 'text', label: 'טקסט חופשי', icon: 'text' },
+    { type: 'number', label: 'מספר', icon: 'number' },
+    { type: 'fullname', label: 'שם מלא', icon: 'user' },
+    { type: 'id_number', label: 'תעודת זהות', icon: 'id' },
+    { type: 'date', label: 'תאריך', icon: 'calendar' },
+    { type: 'checkbox', label: 'תיבת סימון', icon: 'checkbox' },
+    { type: 'signature', label: 'חתימה', icon: 'pen' },
+    { type: 'file', label: 'צירוף קובץ', icon: 'doc' },
+    { type: 'dropdown', label: 'בחירה מרשימה', icon: 'dropdown' },
+    { type: 'heading', label: 'כותרת', icon: 'heading' },
+    { type: 'paragraph', label: 'פסקה/הסבר', icon: 'paragraph' },
+];
 
 // ==================== IndexedDB for large image data ====================
 const _idbName = 'smoov_images_db';
@@ -233,6 +260,9 @@ function renderSidebar() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             שלח מסמך
         </button>
+        <button class="sidebar-send-btn" style="background:linear-gradient(135deg,#059669,#10b981);margin-top:6px;" onclick="startFormBuilder()">
+            ${ICO.doc} צור טופס חדש
+        </button>
 
         <button class="sidebar-item ${v === 'home' ? 'active' : ''}" onclick="switchView('home')">
             <span class="sidebar-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
@@ -307,7 +337,7 @@ function render() {
     if (wizardBody) scrolls.wizard = { y: wizardBody.scrollTop };
 
     // Toggle fullscreen mode for wizard/sign views
-    const isFullscreen = DM.view === 'create' || DM.view === 'sign';
+    const isFullscreen = DM.view === 'create' || DM.view === 'sign' || DM.view === 'create_form';
     document.body.classList.toggle('fullscreen-view', isFullscreen);
 
     // Render sidebar for non-fullscreen views
@@ -324,6 +354,7 @@ function render() {
     else if (v === 'templates') renderTemplates(main);
     else if (v === 'contacts') renderContacts(main);
     else if (v === 'create') renderWizard(main);
+    else if (v === 'create_form') { renderFormBuilder(main); return; }
     else if (v === 'sign') renderSignView(main);
     else if (v === 'shared') renderSharedDocumentView(main);
 
@@ -868,6 +899,14 @@ function resetEditor() {
     DM._allowNoRecipients = false;
     DM._fromTemplate = false;
     DM._templateId = null;
+    // Form builder reset
+    DM.formTitle = '';
+    DM.formDescription = '';
+    DM.formLogo = null;
+    DM.formFields = [];
+    DM._isFormBuilder = false;
+    DM._formSheetsUrl = '';
+    DM._formMakeUrl = '';
 }
 
 // ==================== WIZARD ====================
@@ -4635,6 +4674,388 @@ if (_initHash.startsWith('#sign/') || _initHash.startsWith('#share/') || _initHa
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appLayout').style.display = '';
     document.getElementById('mainContent').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;"><div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>טוען מסמך...</div></div>';
+}
+
+// ==================== FORM BUILDER ====================
+
+function startFormBuilder() {
+    DM.step = 1;
+    DM.formTitle = '';
+    DM.formDescription = '';
+    DM.formLogo = null;
+    DM.formFields = [];
+    DM.recipients = [];
+    DM.isTemplate = false;
+    DM._isFormBuilder = true;
+    DM._formSheetsUrl = '';
+    DM._formMakeUrl = '';
+    switchView('create_form');
+}
+
+function renderFormBuilder(el) {
+    const steps = [
+        { id: 1, label: 'פרטי הטופס' },
+        { id: 2, label: 'שדות הטופס' },
+        { id: 3, label: 'שליחה' }
+    ];
+
+    el.innerHTML = `<div class="wizard">
+        <div class="wizard-header">
+            <button class="btn btn-ghost" onclick="resetEditor();switchView('home')">✕ סגור</button>
+            <span style="font-weight:700;">יצירת טופס חדש</span>
+            <div style="width:80px;"></div>
+        </div>
+        <div class="wizard-stepper">
+            ${steps.map((s, i) => `
+                ${i > 0 ? `<div class="step-line ${s.id <= DM.step ? 'done' : ''}"></div>` : ''}
+                <div style="display:flex;flex-direction:column;align-items:center;${s.id < DM.step ? 'cursor:pointer;' : ''}" ${s.id < DM.step ? `onclick="goFormStep(${s.id})"` : ''}>
+                    <div class="step-dot ${s.id === DM.step ? 'active' : s.id < DM.step ? 'done' : ''}">${s.id < DM.step ? '✓' : s.id === DM.step ? '●' : s.id}</div>
+                    <span class="step-label ${s.id === DM.step ? 'active' : ''}">${s.label}</span>
+                </div>
+            `).join('')}
+        </div>
+        <div class="wizard-body" id="wizardBody"></div>
+        <div class="wizard-footer">
+            <div>${DM.step > 1 ? `<button class="btn btn-outline" onclick="goFormStep(${DM.step - 1})">הקודם</button>` : ''}</div>
+            <div id="wizardNextBtn"></div>
+        </div>
+    </div>`;
+
+    renderFormStep();
+    renderFormNextBtn();
+}
+
+function goFormStep(s) {
+    if (s === 2 && !DM.formTitle.trim()) { toast('יש להזין כותרת לטופס', 'error'); return; }
+    if (s === 3 && DM.formFields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    DM.step = s;
+    render();
+}
+
+function renderFormNextBtn() {
+    const el = document.getElementById('wizardNextBtn');
+    if (!el) return;
+    if (DM.step < 3) {
+        const disabled = DM.step === 1 && !DM.formTitle.trim() ? 'disabled' : '';
+        el.innerHTML = `<button class="btn btn-primary btn-lg" onclick="goFormStep(${DM.step + 1})" ${disabled}>הבא</button>`;
+    } else {
+        el.innerHTML = `<button class="btn btn-success btn-lg" onclick="sendForm()">שלח טופס</button>`;
+    }
+}
+
+function renderFormStep() {
+    const el = document.getElementById('wizardBody');
+    if (!el) return;
+    if (DM.step === 1) renderFormDetails(el);
+    else if (DM.step === 2) renderFormFieldEditor(el);
+    else if (DM.step === 3) renderFormSend(el);
+}
+
+// ---- Step 1: Form Details ----
+function renderFormDetails(el) {
+    el.innerHTML = `<div class="upload-area">
+        <h2 style="font-size:1.3em;font-weight:700;margin-bottom:6px;">פרטי הטופס</h2>
+        <p style="color:var(--text-light);margin-bottom:24px;">הזן את פרטי הטופס הבסיסיים</p>
+        <div style="max-width:560px;margin:0 auto;">
+            <div class="form-group">
+                <label class="form-label">כותרת הטופס *</label>
+                <input type="text" class="form-input" value="${esc(DM.formTitle)}" oninput="DM.formTitle=this.value;renderFormNextBtn();" placeholder="לדוגמה: טופס הרשמה, סקר שביעות רצון..." autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label">תיאור (אופציונלי)</label>
+                <textarea class="form-input" rows="3" oninput="DM.formDescription=this.value" placeholder="הסבר קצר על הטופס...">${esc(DM.formDescription)}</textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">לוגו (אופציונלי)</label>
+                ${DM.formLogo ? `
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:10px;">
+                        <img src="${DM.formLogo}" alt="logo" style="max-height:60px;max-width:120px;border-radius:8px;">
+                        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="DM.formLogo=null;render();">הסר</button>
+                    </div>
+                ` : `
+                    <label class="form-logo-upload">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <span style="font-size:0.88em;color:var(--text-light);margin-top:6px;">לחץ להעלאת לוגו</span>
+                        <input type="file" style="display:none;" accept="image/*" onchange="uploadFormLogo(this)">
+                    </label>
+                `}
+            </div>
+        </div>
+    </div>`;
+}
+
+function uploadFormLogo(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { DM.formLogo = e.target.result; render(); };
+    reader.readAsDataURL(file);
+}
+
+// ---- Step 2: Field Editor ----
+function renderFormFieldEditor(el) {
+    el.innerHTML = `<div style="max-width:640px;margin:0 auto;">
+        <h2 style="font-size:1.3em;font-weight:700;margin-bottom:6px;">שדות הטופס</h2>
+        <p style="color:var(--text-light);margin-bottom:20px;">הוסף את השדות שהנמען ימלא</p>
+        <div class="form-fields-list" id="formFieldsList">
+            ${DM.formFields.map((f, idx) => renderFormFieldCard(f, idx)).join('')}
+        </div>
+        <button class="btn btn-outline" style="margin-top:14px;width:100%;padding:12px;border-style:dashed;" onclick="showFormFieldPicker()">
+            + הוסף שדה
+        </button>
+    </div>`;
+    initFormFieldDragDrop();
+}
+
+function showFormFieldPicker() {
+    const existing = document.getElementById('fieldPickerModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'fieldPickerModal';
+    modal.className = 'field-picker-modal';
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = `<div class="field-picker-content">
+        <h3 style="font-weight:700;margin-bottom:16px;text-align:center;">בחר סוג שדה</h3>
+        <div class="field-picker-grid">
+            ${FORM_FIELD_TYPES.map(ft => `
+                <div class="field-picker-item" onclick="addFormField('${ft.type}');document.getElementById('fieldPickerModal').remove();">
+                    <span style="font-size:1.4em;">${ICO[ft.icon] || ''}</span>
+                    <span>${ft.label}</span>
+                </div>
+            `).join('')}
+        </div>
+        <button class="btn btn-ghost" style="width:100%;margin-top:12px;" onclick="document.getElementById('fieldPickerModal').remove()">ביטול</button>
+    </div>`;
+    document.body.appendChild(modal);
+}
+
+function addFormField(type) {
+    const ftDef = FORM_FIELD_TYPES.find(t => t.type === type);
+    const field = {
+        id: 'ff_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        type: type,
+        label: ftDef ? ftDef.label : type,
+        required: false,
+        placeholder: '',
+    };
+    // Type-specific defaults
+    if (type === 'dropdown') field.options = ['אפשרות 1', 'אפשרות 2'];
+    if (type === 'heading') { field.content = 'כותרת'; field.required = false; }
+    if (type === 'paragraph') { field.content = ''; field.required = false; }
+    DM.formFields.push(field);
+    render();
+}
+
+function renderFormFieldCard(f, idx) {
+    const ftDef = FORM_FIELD_TYPES.find(t => t.type === f.type);
+    const icon = ftDef ? (ICO[ftDef.icon] || '') : '';
+    const isDecorative = f.type === 'heading' || f.type === 'paragraph';
+
+    let extra = '';
+    // Placeholder for non-decorative fields
+    if (!isDecorative) {
+        extra += `<div style="padding:4px 0 0 0;margin-top:4px;">
+            <input type="text" class="form-input" style="font-size:0.82em;padding:6px 10px;" placeholder="טקסט עזרה (placeholder)" value="${esc(f.placeholder || '')}" oninput="DM.formFields[${idx}].placeholder=this.value">
+        </div>`;
+    }
+    // Content for heading/paragraph
+    if (f.type === 'heading') {
+        extra += `<div style="padding:4px 0 0 0;margin-top:4px;">
+            <input type="text" class="form-input" style="font-size:0.95em;font-weight:700;padding:6px 10px;" placeholder="טקסט הכותרת" value="${esc(f.content || '')}" oninput="DM.formFields[${idx}].content=this.value">
+        </div>`;
+    }
+    if (f.type === 'paragraph') {
+        extra += `<div style="padding:4px 0 0 0;margin-top:4px;">
+            <textarea class="form-input" style="font-size:0.85em;padding:6px 10px;resize:vertical;" rows="2" placeholder="טקסט הפסקה / הסבר" oninput="DM.formFields[${idx}].content=this.value">${esc(f.content || '')}</textarea>
+        </div>`;
+    }
+    // Options for dropdown
+    if (f.type === 'dropdown') {
+        extra += `<div style="padding:6px 0 0 0;margin-top:4px;">
+            <div style="font-size:0.82em;color:var(--text-light);margin-bottom:6px;">אפשרויות:</div>
+            ${(f.options || []).map((opt, oi) => `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                    <input type="text" class="form-input" style="font-size:0.82em;padding:4px 8px;flex:1;" value="${esc(opt)}" oninput="updateFormFieldOption(${idx},${oi},this.value)">
+                    <button class="btn btn-ghost btn-sm ff-delete" onclick="removeFormFieldOption(${idx},${oi})" title="הסר">&times;</button>
+                </div>
+            `).join('')}
+            <button class="btn btn-ghost btn-sm" style="font-size:0.78em;color:var(--primary);margin-top:2px;" onclick="addFormFieldOption(${idx})">+ הוסף אפשרות</button>
+        </div>`;
+    }
+
+    return `<div class="ff-card" draggable="true" data-idx="${idx}">
+        <div class="ff-card-header">
+            <span class="ff-drag-handle" title="גרור לשינוי סדר">⠿</span>
+            <span class="ff-type-icon">${icon}</span>
+            <input type="text" class="ff-label-input" value="${esc(f.label)}" oninput="DM.formFields[${idx}].label=this.value" placeholder="שם השדה">
+            ${!isDecorative ? `
+                <label class="ff-required-toggle">
+                    <input type="checkbox" ${f.required ? 'checked' : ''} onchange="DM.formFields[${idx}].required=this.checked">
+                    <span style="font-size:0.75em;color:var(--text-light);">חובה</span>
+                </label>
+            ` : ''}
+            <button class="btn btn-ghost btn-sm ff-delete" onclick="removeFormField(${idx})" title="מחק שדה">${ICO.trash}</button>
+        </div>
+        ${extra}
+    </div>`;
+}
+
+function removeFormField(idx) {
+    DM.formFields.splice(idx, 1);
+    render();
+}
+
+function addFormFieldOption(idx) {
+    if (!DM.formFields[idx].options) DM.formFields[idx].options = [];
+    DM.formFields[idx].options.push('אפשרות ' + (DM.formFields[idx].options.length + 1));
+    render();
+}
+
+function removeFormFieldOption(idx, optIdx) {
+    DM.formFields[idx].options.splice(optIdx, 1);
+    render();
+}
+
+function updateFormFieldOption(idx, optIdx, val) {
+    DM.formFields[idx].options[optIdx] = val;
+}
+
+function initFormFieldDragDrop() {
+    const list = document.getElementById('formFieldsList');
+    if (!list) return;
+    let dragIdx = null;
+
+    list.querySelectorAll('.ff-card').forEach(card => {
+        card.addEventListener('dragstart', e => {
+            dragIdx = parseInt(card.dataset.idx);
+            card.classList.add('ff-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('ff-dragging');
+            dragIdx = null;
+        });
+        card.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        card.addEventListener('drop', e => {
+            e.preventDefault();
+            const dropIdx = parseInt(card.dataset.idx);
+            if (dragIdx !== null && dragIdx !== dropIdx) {
+                const item = DM.formFields.splice(dragIdx, 1)[0];
+                DM.formFields.splice(dropIdx, 0, item);
+                render();
+            }
+        });
+    });
+}
+
+// ---- Step 3: Send ----
+function renderFormSend(el) {
+    el.innerHTML = `<div class="send-area">
+        <h2 style="font-size:1.3em;font-weight:700;margin-bottom:20px;">שליחת הטופס</h2>
+        <div class="send-grid">
+            <div class="send-card">
+                <div style="margin-bottom:16px;">
+                    <h3 style="font-weight:700;font-size:0.95em;margin-bottom:4px;">${esc(DM.formTitle)}</h3>
+                    ${DM.formDescription ? `<p style="font-size:0.85em;color:var(--text-light);">${esc(DM.formDescription)}</p>` : ''}
+                    <div style="font-size:0.82em;color:var(--text-muted);margin-top:6px;">${DM.formFields.length} שדות</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">נמענים</label>
+                    <p style="font-size:0.82em;color:var(--text-light);margin-bottom:8px;">הוסף נמענים שיקבלו את הטופס למילוי</p>
+                    <div id="formRecipientsList">
+                        ${DM.recipients.map((r, i) => `
+                            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:6px;">
+                                <span style="font-weight:700;color:var(--primary);font-size:0.85em;min-width:20px;">${i + 1}</span>
+                                <input type="text" class="form-input" style="flex:2;font-size:0.88em;padding:6px 10px;" placeholder="שם" value="${esc(r.name || '')}" oninput="DM.recipients[${i}].name=this.value">
+                                <input type="text" class="form-input" style="flex:2;font-size:0.88em;padding:6px 10px;direction:ltr;" placeholder="טלפון" value="${esc(r.phone || '')}" oninput="DM.recipients[${i}].phone=this.value">
+                                <button class="btn btn-ghost btn-sm ff-delete" onclick="DM.recipients.splice(${i},1);render();">${ICO.trash}</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-ghost btn-sm" style="color:var(--primary);font-size:0.85em;margin-top:4px;" onclick="DM.recipients.push({id:Date.now(),name:'',phone:'',colorIndex:DM.recipients.length});render();">+ הוסף נמען</button>
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label class="form-label">הודעת וואטסאפ (אופציונלי)</label>
+                    <textarea class="form-input" rows="2" id="formWhatsAppMsg" placeholder="הודעה שתצורף לקישור בוואטסאפ..." style="resize:none;"></textarea>
+                </div>
+            </div>
+            <div>
+                <div class="send-card">
+                    <h3 style="font-weight:700;font-size:0.9em;margin-bottom:14px;">אינטגרציות (אופציונלי)</h3>
+                    <div class="form-group">
+                        <label class="form-label">Google Sheets Webhook URL</label>
+                        <input type="url" class="form-input" style="direction:ltr;font-size:0.85em;" placeholder="https://script.google.com/..." value="${esc(DM._formSheetsUrl)}" oninput="DM._formSheetsUrl=this.value">
+                        <small style="font-size:0.75em;color:var(--text-muted);margin-top:4px;display:block;">נתוני הטופס ישלחו לגיליון אלקטרוני</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Make.com Webhook URL</label>
+                        <input type="url" class="form-input" style="direction:ltr;font-size:0.85em;" placeholder="https://hook.make.com/..." value="${esc(DM._formMakeUrl)}" oninput="DM._formMakeUrl=this.value">
+                        <small style="font-size:0.75em;color:var(--text-muted);margin-top:4px;display:block;">הפעלת אוטומציה עם מילוי הטופס</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function sendForm() {
+    if (DM.formFields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    if (!DM.formTitle.trim()) { toast('יש להזין כותרת לטופס', 'error'); return; }
+
+    const now = new Date().toISOString();
+    const doc = {
+        id: 'fm_' + Date.now(),
+        type: 'form',
+        fileName: DM.formTitle,
+        formTitle: DM.formTitle,
+        formDescription: DM.formDescription,
+        formLogo: DM.formLogo,
+        formFields: JSON.parse(JSON.stringify(DM.formFields)),
+        recipients: JSON.parse(JSON.stringify(DM.recipients.filter(r => r.name && r.name.trim()))),
+        webhookUrl: DM._formSheetsUrl || null,
+        makeWebhookUrl: DM._formMakeUrl || null,
+        status: 'sent',
+        createdAt: now,
+        createdBy: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.email : '',
+        ownerUid: (typeof smoovCurrentUser !== 'undefined' && smoovCurrentUser) ? smoovCurrentUser.uid : '',
+        audit: [
+            { action: 'created', time: now, detail: 'הטופס נוצר' },
+            { action: 'sent', time: now, detail: `נשלח ל-${DM.recipients.filter(r => r.name && r.name.trim()).length} נמענים` }
+        ]
+    };
+
+    DM.docs.push(doc);
+    save();
+
+    // Save to Firebase
+    if (typeof firebaseSaveDoc === 'function') {
+        firebaseSaveDoc(doc).then(ok => {
+            if (ok) console.log('Form saved to Firebase');
+        });
+    }
+
+    // WhatsApp notifications
+    const msg = document.getElementById('formWhatsAppMsg')?.value || '';
+    doc.recipients.forEach(r => {
+        if (r.phone) {
+            const phone = r.phone.replace(/[^0-9]/g, '');
+            if (phone.length >= 9) {
+                const intl = phone.startsWith('0') ? '972' + phone.substring(1) : phone;
+                const formUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
+                const waMsg = `שלום ${r.name},\nנשלח אליך טופס "${DM.formTitle}" למילוי.\n${msg}\nקישור למילוי: ${formUrl}`;
+                const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
+                if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
+            }
+        }
+    });
+
+    toast('הטופס נוצר בהצלחה!');
+    resetEditor();
+    showLinkSuccess(doc);
 }
 
 // Migrate images from localStorage to IndexedDB (one-time on upgrade)
