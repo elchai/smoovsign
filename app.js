@@ -145,12 +145,14 @@ function save() {
         const copy = Object.assign({}, d);
         delete copy.docImage;
         delete copy.docPages;
+        delete copy._formValues;
         return copy;
     });
     const tplsLite = DM.templates.map(t => {
         const copy = Object.assign({}, t);
         delete copy.docImage;
         delete copy.docPages;
+        delete copy._formValues;
         return copy;
     });
     try {
@@ -4206,47 +4208,53 @@ function openFormSignature(docId, fieldId) {
     document.body.appendChild(overlay);
     overlay.onclick = e => { if (e.target === overlay) cancelSignCanvas(); };
 
-    // Setup canvas
-    const canvas = document.getElementById('signCanvas');
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#2563eb';
+    // Setup canvas after browser paints the modal (avoids getBoundingClientRect returning 0)
+    setTimeout(() => {
+        const canvas = document.getElementById('signCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#2563eb';
 
-    let drawing = false;
-    let lastX = 0, lastY = 0;
+        let drawing = false;
+        let lastX = 0, lastY = 0;
 
-    function getPos(e) {
-        const r = canvas.getBoundingClientRect();
-        const t = e.touches ? e.touches[0] : e;
-        return { x: t.clientX - r.left, y: t.clientY - r.top };
-    }
+        function getPos(e) {
+            const r = canvas.getBoundingClientRect();
+            const t = e.touches ? e.touches[0] : e;
+            return { x: t.clientX - r.left, y: t.clientY - r.top };
+        }
 
-    canvas.addEventListener('pointerdown', e => {
-        drawing = true;
-        const p = getPos(e);
-        lastX = p.x; lastY = p.y;
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-    });
-    canvas.addEventListener('pointermove', e => {
-        if (!drawing) return;
-        e.preventDefault();
-        const p = getPos(e);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        lastX = p.x; lastY = p.y;
-    });
-    canvas.addEventListener('pointerup', () => { drawing = false; });
-    canvas.addEventListener('pointerleave', () => { drawing = false; });
+        canvas.addEventListener('pointerdown', e => {
+            drawing = true;
+            const p = getPos(e);
+            lastX = p.x; lastY = p.y;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        });
+        canvas.addEventListener('pointermove', e => {
+            if (!drawing) return;
+            e.preventDefault();
+            const p = getPos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            lastX = p.x; lastY = p.y;
+        });
+        canvas.addEventListener('pointerup', () => { drawing = false; });
+        canvas.addEventListener('pointerleave', () => { drawing = false; });
+
+        // Expose canvas for clearSignCanvas()
+        window._signCanvas = canvas;
+    }, 50);
 }
 
 function confirmFormSignature() {
