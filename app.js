@@ -5710,8 +5710,8 @@ function renderFormSend(el) {
                     <button class="btn btn-ghost btn-sm" style="color:var(--primary);font-size:0.85em;margin-top:4px;" onclick="DM.recipients.push({id:Date.now(),name:'',phone:'',colorIndex:DM.recipients.length});render();">+ הוסף נמען</button>
                 </div>
                 <div class="form-group" style="margin-top:16px;">
-                    <label class="form-label">הודעת וואטסאפ (אופציונלי)</label>
-                    <textarea class="form-input" rows="2" id="formWhatsAppMsg" placeholder="הודעה שתצורף לקישור בוואטסאפ..." style="resize:none;"></textarea>
+                    <label class="form-label">הודעת וואצאפ (אופציונלי)</label>
+                    <textarea class="form-input" rows="2" id="formWhatsAppMsg" placeholder="הודעה שתצורף לקישור בוואצאפ..." style="resize:none;"></textarea>
                 </div>
             </div>
             <div>
