@@ -145,7 +145,7 @@ console.log(status.status);           <span class="comment">// 'sent' | 'complet
 <span class="comment">//   { name: 'דוד לוי',   phone: '050...', id: 'dm_...', signUrl: 'https://...' }</span>
 <span class="comment">// ]</span>
 
-<span class="comment">// שלח בוואטסאפ:</span>
+<span class="comment">// שלח בוואצאפ:</span>
 links.forEach(l => {
     <span class="keyword">const</span> intl = l.phone.replace(<span class="string">/^0/</span>, <span class="string">'972'</span>);
     window.open(<span class="string">`https://wa.me/${intl}?text=שלום ${l.name}, מלא שאלון: ${l.signUrl}`</span>);
