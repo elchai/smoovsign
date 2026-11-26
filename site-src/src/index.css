@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body { @apply bg-[#f6f8fe] font-sans text-ink antialiased; }
+  h1, h2, h3, p, li, summary { text-wrap: balance; }
+  :focus-visible { outline: 3px solid #38bdf8; outline-offset: 3px; border-radius: 8px; }
+  body.hc { background: #fff; color: #000; }
+  body.hc .card-glass { background: #fff; border-color: #000; }
+}
+
+@layer components {
+  .card-glass {
+    @apply rounded-3xl border border-slate-200/60 bg-white/80 shadow-soft backdrop-blur-xl;
+    border-width: 1px;
+  }
+  .icon-box {
+    @apply grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700 transition duration-300;
+  }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-bold transition duration-200 hover:-translate-y-0.5; }
+  .btn-cta { @apply btn bg-aqua text-night shadow-[0_12px_30px_-8px_rgba(56,189,248,.6)] hover:bg-aqua-soft; }
+  .btn-brand { @apply btn bg-brand-600 text-white shadow-[0_12px_30px_-8px_rgba(47,71,207,.6)] hover:bg-brand-700; }
+  .btn-ghost { @apply btn border border-brand-200 bg-white/70 text-brand-800 hover:bg-white; }
+  .eyebrow { @apply inline-flex items-center gap-1 rounded-full bg-aqua/15 px-4 py-1.5 font-sans text-[13px] font-bold tracking-wide text-aqua-ink; }
+  .tag-soon { @apply ms-2 whitespace-nowrap rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800; }
+}
+
+@layer components {
+  .grid-bg { background-image: linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px); background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 75%); mask-image: radial-gradient(ellipse at 50% 30%, #000 30%, transparent 75%); }
+  .mono-tag { @apply font-sans text-[13px] font-bold tracking-wide text-aqua-ink; }
+  .mono-tag-dark { @apply font-sans text-[13px] font-bold tracking-wide text-aqua; }
+  .btn-aqua { @apply btn bg-aqua text-night shadow-[0_14px_36px_-10px_rgba(56,189,248,.7)] hover:bg-aqua-soft; }
+  .btn-line { @apply btn border border-white/25 bg-white/5 text-white backdrop-blur hover:bg-white/10; }
+}
+@media (prefers-reduced-motion: reduce) { .animate-marquee, .animate-floaty, .animate-pulseRing { animation: none !important; } }
