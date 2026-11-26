@@ -44,7 +44,50 @@ const DM = {
 };
 
 // HTML-escape to prevent XSS from user-controlled strings
-function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// Ids for documents and templates. The id is the whole access key of a signing link,
+// so it carries a random part (old timestamp-only ids keep working).
+function _newId(prefix) {
+    let rnd = '';
+    try {
+        const a = new Uint8Array(9);
+        crypto.getRandomValues(a);
+        rnd = Array.from(a, b => (b % 36).toString(36)).join('');
+    } catch (e) {
+        rnd = Math.random().toString(36).slice(2, 11);
+    }
+    return prefix + Date.now() + '_' + rnd;
+}
+const _SAFE_LINK_ID = /^[A-Za-z0-9_.\-]{1,120}$/;
+
+// Phone photos are several MB. Everything a signer attaches is stored inside the
+// document (1MB cap), so images are scaled down before they are kept.
+function _compressImageFile(file, maxDim, mime, quality) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = e => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('image decode failed'));
+            img.onload = () => {
+                let w = img.width, h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                    else { w = Math.round(w * maxDim / h); h = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (mime === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL(mime, quality));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 // SVG Icons (monochrome, no emoji)
 const ICO = {
@@ -161,18 +204,21 @@ function save() {
     } catch (e) {
         console.warn('localStorage save error:', e);
     }
-    // Save images to IndexedDB in background
-    DM.docs.forEach(d => {
-        if (d.id && (d.docImage || (d.docPages && d.docPages.length))) {
-            idbSaveImages(d.id, { docImage: d.docImage, docPages: d.docPages });
-        }
-    });
-    DM.templates.forEach(t => {
-        if (t.id && (t.docImage || (t.docPages && t.docPages.length))) {
-            idbSaveImages(t.id, { docImage: t.docImage, docPages: t.docPages });
-        }
-    });
+    // Save images to IndexedDB in background (only when they changed since the last write:
+    // save() runs on every filled field and rewriting every image each time froze phones)
+    const _idbPut = item => {
+        if (!item.id || !(item.docImage || (item.docPages && item.docPages.length))) return;
+        const img = item.docImage || '';
+        const pages = item.docPages || [];
+        const sig = img.length + ':' + img.slice(-24) + ':' + pages.length + ':' + pages.map(p => (p || '').length).join(',');
+        if (_idbSavedSig[item.id] === sig) return;
+        _idbSavedSig[item.id] = sig;
+        idbSaveImages(item.id, { docImage: item.docImage, docPages: item.docPages });
+    };
+    DM.docs.forEach(_idbPut);
+    DM.templates.forEach(_idbPut);
 }
+const _idbSavedSig = {};
 
 // Load images from IndexedDB back into DM arrays on startup
 async function restoreImagesFromIDB() {
@@ -225,8 +271,9 @@ function toast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.className = `toast ${type}`;
-    const duration = type === 'error' ? 5000 : 3000;
-    setTimeout(() => el.className = 'toast hidden', duration);
+    const duration = type === 'error' ? 6000 : 3000;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => el.className = 'toast hidden', duration);
 }
 
 // ==================== NAVIGATION ====================
@@ -509,9 +556,10 @@ function renderDocRows(docs, mode) {
         const totalR = (doc.recipients || []).length;
         const pct = totalR > 0 ? Math.round((signedCount / totalR) * 100) : 0;
         const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date() && doc.status !== 'completed';
-        const statusText = doc.status === 'completed' ? 'אושר' : isExpired ? 'פג תוקף' : pct > 0 ? 'בתהליך' : 'ממתין';
-        const statusBadge = doc.status === 'completed' ? 'badge-success' : isExpired ? 'badge-danger' : pct > 0 ? 'badge-warning' : 'badge-info';
-        const statusColor = doc.status === 'completed' ? 'var(--success)' : isExpired ? 'var(--danger)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
+        const isRefused = doc.status !== 'completed' && (!!doc.refusedAt || (doc.audit || []).some(a => a && a.action === 'refused'));
+        const statusText = doc.status === 'completed' ? 'אושר' : isRefused ? 'סורב' : isExpired ? 'פג תוקף' : pct > 0 ? 'בתהליך' : 'ממתין';
+        const statusBadge = doc.status === 'completed' ? 'badge-success' : (isRefused || isExpired) ? 'badge-danger' : pct > 0 ? 'badge-warning' : 'badge-info';
+        const statusColor = doc.status === 'completed' ? 'var(--success)' : (isRefused || isExpired) ? 'var(--danger)' : pct > 0 ? 'var(--warning)' : 'var(--text-muted)';
         const created = doc.createdAt ? new Date(doc.createdAt).toLocaleString('he-IL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
         const rcptName = (doc.recipients || [])[0]?.name || '';
         const rcptInitials = rcptName ? rcptName.split(' ').map(w => w[0]).join('').substring(0, 2) : '?';
@@ -1799,8 +1847,9 @@ function openEditorSignature(fieldId) {
     ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     function pos(e) {
         const r = canvas.getBoundingClientRect();
-        const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
-        const cy = (e.clientY || e.touches?.[0]?.clientY || 0) - r.top;
+        const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+        const cx = (t.clientX || 0) - r.left;
+        const cy = (t.clientY || 0) - r.top;
         return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
     }
     canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
@@ -2086,7 +2135,7 @@ function createLinkOnly() {
         if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
         const now = new Date().toISOString();
         const doc = {
-            id: 'dm_' + Date.now(),
+            id: _newId('dm_'),
             fileName: DM.fileName || 'מסמך ללא שם',
             docImage: DM.docImage,
             docPages: DM.docPages || [],
@@ -2209,7 +2258,7 @@ function saveAsTemplateFromDoc(docId) {
     const doc = DM.docs.find(d => d.id === docId);
     if (!doc) return;
     const tpl = {
-        id: 'tpl_' + Date.now(),
+        id: _newId('tpl_'),
         name: doc.fileName,
         fileName: doc.fileName,
         docImage: doc.docImage,
@@ -2236,6 +2285,7 @@ function sendDocument() {
     const emptyNames = DM.recipients.filter(r => !r.name || !r.name.trim());
     if (emptyNames.length > 0) { toast('יש להזין שם לכל הנמענים', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
     _sendingDoc = true;
     const sendBtn = document.querySelector('.btn-success.btn-lg');
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'שולח...'; }
@@ -2243,7 +2293,7 @@ function sendDocument() {
         const now = new Date().toISOString();
         const expiryInput = document.getElementById('docExpiry');
         const doc = {
-            id: 'dm_' + Date.now(),
+            id: _newId('dm_'),
             fileName: DM.fileName || 'מסמך ללא שם',
             docImage: DM.docImage,
             docPages: DM.docPages || [],
@@ -2280,7 +2330,7 @@ function sendDocument() {
                     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
                     const waMsg = `שלום ${r.name},\nנשלח אליך מסמך "${DM.fileName}" לחתימה דיגיטלית.\n${msg}\nקישור לחתימה: ${signUrl}`;
                     const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
-                    if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
+                    if (!opened) toast('חלון וואצאפ נחסם. אפשר להעתיק את הקישור ולשלוח ידנית', 'error');
                 }
             }
         });
@@ -2298,9 +2348,13 @@ function sendDocument() {
 }
 
 // ==================== SAVE TEMPLATE ====================
+let _savingTemplate = false;
 async function saveTemplate() {
+    if (_savingTemplate) return;
     if (!DM.docImage) { toast('יש להעלות מסמך קודם', 'error'); return; }
     if (DM.fields.length === 0) { toast('יש להוסיף לפחות שדה אחד', 'error'); return; }
+    _savingTemplate = true;
+    setTimeout(() => { _savingTemplate = false; }, 4000);
 
     // Show saving indicator
     const saveBtn = document.querySelector('.wizard-footer .btn-success');
@@ -2309,7 +2363,7 @@ async function saveTemplate() {
 
     try {
         const tpl = {
-            id: DM.editingTemplateId || 'tpl_' + Date.now(),
+            id: DM.editingTemplateId || _newId('tpl_'),
             name: DM.fileName || 'תבנית ללא שם',
             docImage: DM.docImage,
             docPages: DM.docPages || [],
@@ -2564,7 +2618,7 @@ function renderSignView(el) {
         signerRecipient = (doc.recipients || []).find(r => r.name && DM._currentSigner && r.name.trim() === DM._currentSigner.trim());
     }
 
-    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', isSignerView ? `${DM._currentSigner} צפה במסמך` : 'המסמך נצפה'); save(); syncDocToFirebase(doc); }
+    _logSignerView(doc, isSignerView, 'צפה במסמך');
 
     const isComplete = doc.status === 'completed';
     const isExpired = doc.expiresAt && new Date(doc.expiresAt) < new Date();
@@ -2767,7 +2821,7 @@ function renderSignView(el) {
     }
   } catch (err) {
     console.error('[sign] renderSignView ERROR:', err, err.stack);
-    el.innerHTML = '<div style="padding:40px;text-align:center;color:red;"><h2>שגיאה בהצגת המסמך</h2><p>' + String(err.message || err) + '</p></div>';
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:red;"><h2>שגיאה בהצגת המסמך</h2><p>' + esc(String(err.message || err)) + '</p></div>';
   }
 }
 
@@ -2917,7 +2971,7 @@ function exitAndSave(docId) {
         </p>
         <div style="display:flex;gap:10px;justify-content:center;">
             <button class="btn btn-outline" onclick="document.getElementById('exitSaveModal').remove()">ביטול</button>
-            <button class="btn btn-primary" onclick="document.getElementById('exitSaveModal').remove();toast('המסמך נשמר.');switchView('home');">צא ושמור טופס</button>
+            <button class="btn btn-primary" onclick="document.getElementById('exitSaveModal').remove();_signerLeave('${docId}','saved');">צא ושמור טופס</button>
         </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -2949,13 +3003,14 @@ function confirmRefuseSign(docId) {
             ? `${DM._currentSigner || 'נמען'} סירב לחתום. סיבה: ${reason.trim()}`
             : `${DM._currentSigner || 'נמען'} סירב לחתום`;
         addAudit(doc, 'refused', detail);
+        doc.refusedAt = new Date().toISOString();
         save();
         syncDocToFirebase(doc);
     }
     const modal = document.getElementById('refuseSignModal');
     if (modal) modal.remove();
     toast('סירוב החתימה נרשם.');
-    switchView('home');
+    _signerLeave(docId, 'refused');
 }
 
 function sendReminder(docId, recipientId) {
@@ -2968,7 +3023,7 @@ function sendReminder(docId, recipientId) {
     const signUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
     const waMsg = `תזכורת: שלום ${r.name}, ממתין לחתימתך על "${doc.fileName}".\nקישור: ${signUrl}`;
     const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
-    if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
+    if (!opened) toast('חלון וואצאפ נחסם. אפשר להעתיק את הקישור ולשלוח ידנית', 'error');
     addAudit(doc, 'reminder', `תזכורת נשלחה ל-${r.name}`);
     save(); syncDocToFirebase(doc);
     toast(`תזכורת נשלחה ל-${r.name}`);
@@ -3280,10 +3335,97 @@ function signField(docId, fieldId) {
     highlightNextField(doc);
 }
 
-function syncDocToFirebase(doc) {
-    if (typeof firebaseUpdateDoc === 'function') {
-        firebaseUpdateDoc(doc).catch(() => {});
+// ==================== CLOUD SYNC ====================
+// Every change a signer makes is pushed to Firestore. Before, a failed push (offline,
+// a document over the 1MB cap) was swallowed and the signer saw "approved" while the
+// owner never got the signature. Now each push retries, times out, and reports.
+let _syncFailNoticeAt = 0;
+function _syncErrorMessage() {
+    const e = window._smoovLastSaveError;
+    if (e === 'too_large') return 'המסמך גדול מדי לשמירה. אפשר לצרף קובץ קטן יותר ולנסות שוב';
+    if (e === 'permission-denied') return 'המסמך כבר הושלם ונעול לשינויים';
+    return 'השמירה בשרת ממתינה לחיבור. כדאי לבדוק את האינטרנט ולנסות שוב';
+}
+function _pushDocOnce(doc) {
+    if (typeof firebaseUpdateDoc !== 'function') return Promise.resolve(true);
+    const timeout = new Promise(r => setTimeout(() => { window._smoovLastSaveError = 'timeout'; r(false); }, 20000));
+    return Promise.race([firebaseUpdateDoc(doc).catch(() => false), timeout]);
+}
+async function syncDocToFirebase(doc, opts = {}) {
+    const attempts = opts.attempts || 3;
+    for (let i = 0; i < attempts; i++) {
+        window._smoovLastSaveError = null;
+        if (await _pushDocOnce(doc)) return true;
+        const err = window._smoovLastSaveError;
+        if (err === 'too_large' || err === 'permission-denied') break;
+        if (i < attempts - 1) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
     }
+    if (!opts.silent && Date.now() - _syncFailNoticeAt > 8000) {
+        _syncFailNoticeAt = Date.now();
+        toast(_syncErrorMessage(), 'error');
+    }
+    return false;
+}
+function _syncDocCritical(doc, onSaved) {
+    return syncDocToFirebase(doc, { silent: true }).then(ok => {
+        if (ok) { if (onSaved) onSaved(); return true; }
+        _showSyncRetry(doc, onSaved);
+        return false;
+    });
+}
+function _showSyncRetry(doc, onSaved) {
+    const old = document.getElementById('syncRetryModal');
+    if (old) old.remove();
+    const err = window._smoovLastSaveError;
+    const canRetry = err !== 'permission-denied';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'syncRetryModal';
+    overlay.innerHTML = `<div class="modal-card" role="alertdialog" aria-labelledby="syncRetryTitle" style="max-width:400px;text-align:center;">
+        <h3 id="syncRetryTitle" style="font-weight:700;margin-bottom:10px;">${canRetry ? 'השמירה עוד לא הושלמה' : 'המסמך נעול'}</h3>
+        <p style="font-size:0.9em;color:var(--text-light);line-height:1.6;margin-bottom:18px;">${esc(_syncErrorMessage())}.${canRetry ? '<br>הנתונים שמורים במכשיר הזה.' : ''}</p>
+        <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn btn-outline" id="_syncClose">סגור</button>
+            ${canRetry ? '<button class="btn btn-primary" id="_syncRetry">נסה שוב</button>' : ''}
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#_syncClose').onclick = () => overlay.remove();
+    const retry = overlay.querySelector('#_syncRetry');
+    if (retry) retry.onclick = () => { overlay.remove(); toast('שומר...', 'info'); _syncDocCritical(doc, onSaved); };
+}
+
+// "Viewed" is logged once per signer per visit (the old shared _viewed flag meant the
+// owner's own first look hid every later signer visit from the activity log)
+const _viewLogged = {};
+function _logSignerView(doc, isSignerView, verb) {
+    if (!isSignerView || doc.status === 'completed') return;
+    const key = doc.id + '|' + (DM._currentSigner || '');
+    if (_viewLogged[key]) return;
+    _viewLogged[key] = true;
+    doc._viewed = true;
+    addAudit(doc, 'viewed', `${DM._currentSigner || 'נמען'} ${verb}`);
+    save(); syncDocToFirebase(doc);
+}
+
+// A signer who leaves gets a closing screen, not the owner's dashboard
+function _signerLeave(docId, reason) {
+    const isSigner = !!DM._currentSigner;
+    if (!isSigner) { toast(reason === 'saved' ? 'המסמך נשמר.' : 'סירוב החתימה נרשם.'); switchView('home'); return; }
+    const main = document.getElementById('mainContent');
+    if (!main) return;
+    const doc = DM.docs.find(d => d.id === docId);
+    const name = doc ? esc(doc.fileName || 'מסמך') : '';
+    const title = reason === 'saved' ? 'המילוי נשמר' : 'הסירוב נרשם';
+    const text = reason === 'saved'
+        ? 'אפשר לחזור ולהשלים את המסמך מאותו קישור בכל זמן.'
+        : 'שולח המסמך יראה את הסירוב ואת הסיבה ביומן הפעילות.';
+    main.innerHTML = `<div class="verify-screen"><div class="verify-card" style="padding:28px;text-align:center;">
+        <h2 style="font-size:1.25em;margin-bottom:6px;">${title}</h2>
+        ${name ? `<p style="font-weight:700;margin-bottom:10px;">"${name}"</p>` : ''}
+        <p style="color:var(--text-light);font-size:0.9em;line-height:1.6;margin-bottom:18px;">${text}</p>
+        ${reason === 'saved' ? `<button class="btn btn-primary btn-lg" style="width:100%;" onclick="openSign('${docId}',{keepSigner:true})">חזרה למסמך</button>` : ''}
+    </div></div>`;
 }
 
 async function syncOwnerDocsFromFirebase(ownerEmail) {
@@ -3294,14 +3436,18 @@ async function syncOwnerDocsFromFirebase(ownerEmail) {
             .get();
         let added = 0;
         snapshot.forEach(docSnap => {
-            const remoteDoc = docSnap.data();
+            if (docSnap.id.startsWith('tpl_')) return;
+            const remoteDoc = (typeof _smoovSanitizeDoc === 'function') ? _smoovSanitizeDoc(docSnap.data(), docSnap.id) : docSnap.data();
             // Skip templates (tpl_ prefix) - they're stored in same collection but belong in DM.templates
             if (remoteDoc.id && remoteDoc.id.startsWith('tpl_')) return;
             const localIdx = DM.docs.findIndex(d => d.id === remoteDoc.id);
+            const local = localIdx >= 0 ? DM.docs[localIdx] : null;
+            const remoteHasMore = local && !local._deleted && local.status !== 'completed'
+                && (remoteDoc.audit || []).length > (local.audit || []).length;
             if (localIdx < 0) {
                 DM.docs.push(remoteDoc);
                 added++;
-            } else if (remoteDoc.status === 'completed' && DM.docs[localIdx].status !== 'completed') {
+            } else if ((remoteDoc.status === 'completed' && DM.docs[localIdx].status !== 'completed') || remoteHasMore) {
                 // Preserve locally-loaded images (Firebase docs don't have docImage/docPages)
                 const localDoc = DM.docs[localIdx];
                 DM.docs[localIdx] = {
@@ -3433,8 +3579,9 @@ function openSignatureCanvas(docId, fieldId) {
 
     function pos(e) {
         const r = canvas.getBoundingClientRect();
-        const cx = (e.clientX || e.touches?.[0]?.clientX || 0) - r.left;
-        const cy = (e.clientY || e.touches?.[0]?.clientY || 0) - r.top;
+        const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+        const cx = (t.clientX || 0) - r.left;
+        const cy = (t.clientY || 0) - r.top;
         return {
             x: cx * (canvas.width / r.width),
             y: cy * (canvas.height / r.height)
@@ -3449,6 +3596,10 @@ function openSignatureCanvas(docId, fieldId) {
         currentStroke = [p];
         ctx.strokeStyle = window._signColor;
         ctx.lineWidth = LINE_WIDTH;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + 0.1, p.y + 0.1);
+        ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
     }
@@ -3544,16 +3695,14 @@ function handleSignUpload(e) {
 
 function processSignUploadFile(file) {
     if (!file.type.startsWith('image/')) { toast('יש להעלות קובץ תמונה בלבד', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-        window._signUploadData = ev.target.result;
+    _compressImageFile(file, 600, 'image/jpeg', 0.85).then(dataUrl => {
+        window._signUploadData = dataUrl;
         const preview = document.getElementById('signUploadPreview');
         const img = document.getElementById('signUploadImg');
         const area = document.getElementById('signUploadArea');
-        if (preview && img) { img.src = ev.target.result; preview.style.display = ''; }
+        if (preview && img) { img.src = dataUrl; preview.style.display = ''; }
         if (area) area.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
+    }).catch(() => toast('לא הצלחנו לקרוא את התמונה. אפשר לנסות תמונה אחרת', 'error'));
 }
 
 function clearSignUpload() {
@@ -3605,9 +3754,10 @@ function redrawCanvas() {
     ctx.lineJoin = 'round';
 
     strokeHistory.forEach(stroke => {
-        if (stroke.length < 2) return;
+        if (!stroke.length) return;
         ctx.beginPath();
         ctx.moveTo(stroke[0].x, stroke[0].y);
+        if (stroke.length === 1) ctx.lineTo(stroke[0].x + 0.1, stroke[0].y + 0.1);
         for (let i = 1; i < stroke.length; i++) {
             ctx.lineTo(stroke[i].x, stroke[i].y);
         }
@@ -3768,9 +3918,9 @@ function openFilePicker(docId, fieldId) {
 function previewFileAttachment(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    // Check file size - max 2MB
-    if (file.size > 2 * 1024 * 1024) {
-        toast('הקובץ גדול מדי (מקסימום 2MB)', 'error');
+    // Images are compressed below, so any phone photo fits. Other files are stored as is.
+    if (!file.type.startsWith('image/') && file.size > 600 * 1024) {
+        toast('הקובץ גדול מדי. אפשר לצרף קובץ עד 600KB או תמונה', 'error');
         return;
     }
     if (file.type.startsWith('image/')) {
@@ -3918,7 +4068,7 @@ function completeSign(docId) {
         addAudit(doc, 'completed', 'המסמך נחתם');
     }
     save();
-    syncDocToFirebase(doc);
+    const _afterSaved = () => {
     toast('החתימה אושרה!');
 
     // Send email notifications
@@ -3944,6 +4094,8 @@ function completeSign(docId) {
     if (doc.webhookUrl && doc.status === 'completed') {
         _fireWebhook(doc).catch(err => console.warn('[webhook] error:', err));
     }
+    };
+    _syncDocCritical(doc, _afterSaved);
 
     if (isSignerView) {
         // Stay on the sign view to show completion
@@ -4075,7 +4227,7 @@ function renderFormSignView(el, doc) {
     }
 
     // Signer view - active form
-    if (!doc._viewed) { doc._viewed = true; addAudit(doc, 'viewed', `${DM._currentSigner} צפה בטופס`); save(); syncDocToFirebase(doc); }
+    _logSignerView(doc, true, 'צפה בטופס');
 
     el.innerHTML = `<div class="form-sign-container">
         <div class="form-sign-card">
@@ -4292,17 +4444,22 @@ function confirmFormSignature() {
 function uploadFormFile(docId, fieldId, input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    if (file.size > 5 * 1024 * 1024) { toast('הקובץ גדול מדי (מקסימום 5MB)', 'error'); return; }
-
-    const reader = new FileReader();
-    reader.onload = () => {
+    const store = dataUrl => {
         const doc = DM.docs.find(d => d.id === docId);
         if (doc) {
             if (!doc._formValues) doc._formValues = {};
-            doc._formValues[fieldId] = reader.result;
+            doc._formValues[fieldId] = dataUrl;
         }
         render();
     };
+    if (file.type.startsWith('image/')) {
+        _compressImageFile(file, 1000, 'image/jpeg', 0.7).then(store)
+            .catch(() => toast('לא הצלחנו לקרוא את התמונה. אפשר לנסות תמונה אחרת', 'error'));
+        return;
+    }
+    if (file.size > 300 * 1024) { toast('הקובץ גדול מדי. אפשר לצרף קובץ עד 300KB או תמונה', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = () => store(reader.result);
     reader.readAsDataURL(file);
 }
 
@@ -4384,8 +4541,7 @@ function submitForm(docId) {
     }
 
     save();
-    syncDocToFirebase(doc);
-
+    const _afterSaved = () => {
     // Trigger integrations on completion
     if (doc.status === 'completed') {
         triggerFormIntegrations(doc);
@@ -4402,6 +4558,8 @@ function submitForm(docId) {
     if (isSignerView && DM._currentSignerEmail && typeof emailNotifySigner === 'function') {
         emailNotifySigner(doc, DM._currentSigner, DM._currentSignerEmail);
     }
+    };
+    _syncDocCritical(doc, _afterSaved);
 
     render();
 }
@@ -4706,8 +4864,8 @@ function openShareModal(docId) {
                     </div>
                     <div style="color:var(--text-light);line-height:1.4;">
                         • הקישור מאפשר לכל מי שיש לו גישה לצפות במסמך ולחתום עליו<br>
-                        • לא נדרשת הרשמה או התחברות<br>
-                        • ניתן לשלוח את הקישור באימייל, WhatsApp או כל אפליקציה אחרת
+                        • החתימה נפתחת ישירות מהקישור<br>
+                        • אפשר לשלוח את הקישור במייל, בוואצאפ או בכל אפליקציה אחרת
                     </div>
                 </div>
             </div>
@@ -4837,7 +4995,7 @@ async function loadAndCloneTemplate(tplId) {
         }
 
         // Clone template into a NEW document
-        const docId = 'dm_' + Date.now();
+        const docId = _newId('dm_');
         const now = new Date().toISOString();
         const signerName = (smoovCurrentUser && smoovCurrentUser.displayName) || '';
         const signerEmail = (smoovCurrentUser && smoovCurrentUser.email) || '';
@@ -4914,12 +5072,14 @@ function checkUrlHash() {
     if (hash.startsWith('#fill/')) {
         if (_fillingTemplate) return true;
         const tplId = hash.substring(6);
+        if (!_SAFE_LINK_ID.test(tplId)) { renderSharedDocumentError('הקישור אינו תקין'); return true; }
         loadAndCloneTemplate(tplId);
         return true;
     }
 
     if (hash.startsWith('#sign/')) {
         const docId = hash.substring(6);
+        if (!_SAFE_LINK_ID.test(docId)) { renderSharedDocumentError('הקישור אינו תקין'); return true; }
         // Skip if loadAndCloneTemplate just set this hash (prevents double openSign)
         if (window._skipNextHashSign === docId) {
             window._skipNextHashSign = null;
@@ -5746,7 +5906,7 @@ function sendForm() {
 
     const now = new Date().toISOString();
     const doc = {
-        id: 'fm_' + Date.now(),
+        id: _newId('fm_'),
         type: 'form',
         fileName: DM.formTitle,
         formTitle: DM.formTitle,
@@ -5793,7 +5953,7 @@ function sendForm() {
                 const formUrl = `${location.origin}${location.pathname}#sign/${doc.id}`;
                 const waMsg = `שלום ${r.name},\nנשלח אליך טופס "${DM.formTitle}" למילוי.\n${msg}\nקישור למילוי: ${formUrl}`;
                 const opened = window.open(`https://wa.me/${intl}?text=${encodeURIComponent(waMsg)}`, '_blank');
-                if (!opened) toast('חלון WhatsApp נחסם - שלח ידנית את הקישור', 'error');
+                if (!opened) toast('חלון וואצאפ נחסם. אפשר להעתיק את הקישור ולשלוח ידנית', 'error');
             }
         }
     });
@@ -5807,7 +5967,7 @@ function sendForm() {
 
 function _saveFormDocAsTemplate(doc) {
     const tpl = {
-        id: 'tpl_' + Date.now(),
+        id: _newId('tpl_'),
         type: 'form',
         isTemplate: true,
         name: doc.formTitle || doc.fileName,

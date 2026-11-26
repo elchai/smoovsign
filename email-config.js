@@ -74,7 +74,8 @@ function initSmoovEmail() {
 // Send notification to document owner when someone signs
 async function emailNotifyOwner(doc, signerName, fieldsInfo) {
     if (!SMOOV_EMAIL.enabled) return false;
-    const recipientEmail = doc.createdBy || SMOOV_EMAIL.ownerEmail;
+    // createdBy can be a non-email marker (SDK documents use 'sdk'), fall back to the owner
+    const recipientEmail = (doc.createdBy && doc.createdBy.includes('@')) ? doc.createdBy : SMOOV_EMAIL.ownerEmail;
     if (!recipientEmail) return false;
     try {
         const signUrl = `https://smoovsign.com/app.html#sign/${doc.id}`;
