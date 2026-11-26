@@ -183,9 +183,15 @@ async function _loadImageChunks(docId) {
         const snapshot = await chunksRef.get();
         if (snapshot.empty) return null;
 
+        // Re-saving a template with a smaller image leaves the old tail chunks behind.
+        // _meta.totalChunks says how many belong to the current save, so ignore the rest.
+        const total = typeof metaSnap.data().totalChunks === 'number' ? metaSnap.data().totalChunks : Infinity;
         const chunks = [];
         snapshot.forEach(doc => {
-            if (doc.id !== '_meta') chunks.push(doc.data());
+            if (doc.id === '_meta') return;
+            const m = /^(?:c|img)_(\d+)$/.exec(doc.id);
+            if (m && Number(m[1]) >= total) return;
+            chunks.push(doc.data());
         });
 
         // Reassemble docImage
@@ -207,11 +213,83 @@ async function _loadImageChunks(docId) {
             }
         }
 
-        return (docImage || docPages.length > 0) ? { docImage, docPages } : null;
+        docImage = _smoovSafeImg(docImage);
+        for (let p = 0; p < docPages.length; p++) docPages[p] = _smoovSafeImg(docPages[p]);
+        return (docImage || docPages.some(Boolean)) ? { docImage, docPages } : null;
     } catch (err) {
         console.warn('Image chunks load error:', err);
         return null;
     }
+}
+
+// ==================== SANITIZE REMOTE DATA ====================
+// Everything read from Firestore is untrusted: a signing link can point at a document
+// that someone else wrote. Ids and numbers end up inside onclick="..." / style="..."
+// attributes, and image strings inside src="...", so they are normalised here once.
+const _SAFE_ID_RE = /^[A-Za-z0-9_.\-]{1,120}$/;
+function _smoovSafeId(v) {
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof v === 'string' && _SAFE_ID_RE.test(v)) return v;
+    return null;
+}
+function _smoovSafeImg(v) {
+    if (typeof v !== 'string') return v == null ? v : null;
+    return /^data:[a-z0-9.+\-\/]+;base64,[A-Za-z0-9+\/=\s]*$/i.test(v) ? v : null;
+}
+function _smoovNum(v, def) {
+    const n = Number(v);
+    return isFinite(n) ? n : def;
+}
+function _smoovSanitizeDoc(data, expectedId) {
+    if (!data || typeof data !== 'object') return data;
+    if (expectedId) data.id = expectedId;
+    else if (!_smoovSafeId(data.id)) data.id = 'dm_' + Date.now();
+    if (data.templateId != null && !_smoovSafeId(data.templateId)) data.templateId = null;
+    if (data.pageWidth != null) data.pageWidth = _smoovNum(data.pageWidth, 0);
+    if (Array.isArray(data.pageHeights)) data.pageHeights = data.pageHeights.map(h => _smoovNum(h, 0));
+    if ('docImage' in data) data.docImage = _smoovSafeImg(data.docImage);
+    if (Array.isArray(data.docPages)) data.docPages = data.docPages.map(_smoovSafeImg);
+    if (data.formLogo != null) data.formLogo = _smoovSafeImg(data.formLogo);
+    const idMap = {};
+    let n = 0;
+    const fixId = (oldId, prefix) => {
+        const ok = _smoovSafeId(oldId);
+        if (ok !== null) return ok;
+        const fresh = prefix + Date.now() + '_' + (n++);
+        idMap[String(oldId)] = fresh;
+        return fresh;
+    };
+    (Array.isArray(data.recipients) ? data.recipients : []).forEach(r => {
+        if (!r || typeof r !== 'object') return;
+        r.id = fixId(r.id, 'r_');
+        r.colorIndex = _smoovNum(r.colorIndex, 0);
+    });
+    const fixField = f => {
+        if (!f || typeof f !== 'object') return;
+        f.id = fixId(f.id, 'f_');
+        ['x', 'y', 'w', 'h', 'page', 'fontSize'].forEach(k => { if (k in f && f[k] != null) f[k] = _smoovNum(f[k], 0); });
+        if (f.assigneeId != null) {
+            const mapped = idMap[String(f.assigneeId)];
+            f.assigneeId = mapped || _smoovSafeId(f.assigneeId);
+        }
+        if (f.signatureData != null) f.signatureData = _smoovSafeImg(f.signatureData);
+        if (f.fileData != null) f.fileData = _smoovSafeImg(f.fileData);
+    };
+    if (Array.isArray(data.fields)) data.fields.forEach(fixField);
+    if (Array.isArray(data.formFields)) data.formFields.forEach(fixField);
+    if (data._formValues && typeof data._formValues === 'object') {
+        Object.keys(data._formValues).forEach(k => {
+            if (!_SAFE_ID_RE.test(k)) delete data._formValues[k];
+        });
+    }
+    return data;
+}
+
+// A Firestore document is capped at ~1MB. Signatures and attachments live inside it,
+// so measure before writing and report a clear reason instead of failing silently.
+const _SMOOV_DOC_MAX_BYTES = 1000000;
+function _smoovDocBytes(obj) {
+    try { return new Blob([JSON.stringify(obj)]).size; } catch (e) { return JSON.stringify(obj).length * 2; }
 }
 
 // ==================== FIRESTORE ====================
@@ -226,7 +304,13 @@ function _stripImages(obj) {
 async function firebaseSaveDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
+        const stripped = _stripImages(doc);
+        if (_smoovDocBytes(stripped) > _SMOOV_DOC_MAX_BYTES) {
+            console.warn('Firestore save doc: document too large', doc.id);
+            window._smoovLastSaveError = 'too_large';
+            return false;
+        }
+        await smoovDb.collection('smoov_docs').doc(doc.id).set(stripped);
         // Save images as chunks in background
         if (doc.docImage || (doc.docPages && doc.docPages.length)) {
             _saveImageChunks(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image chunks bg error:', e));
@@ -243,9 +327,10 @@ async function firebaseLoadDoc(docId) {
     try {
         const snap = await smoovDb.collection('smoov_docs').doc(docId).get();
         if (!snap.exists) return null;
-        const data = snap.data();
-        // Load images from chunks
-        const imgs = await _loadImageChunks(docId);
+        const data = _smoovSanitizeDoc(snap.data(), snap.id);
+        // Load images from chunks (template copies may keep their images on the template)
+        let imgs = await _loadImageChunks(docId);
+        if (!imgs && data.templateId) imgs = await _loadImageChunks(data.templateId);
         if (imgs) {
             if (imgs.docImage) data.docImage = imgs.docImage;
             if (imgs.docPages && imgs.docPages.length) data.docPages = imgs.docPages;
@@ -257,16 +342,23 @@ async function firebaseLoadDoc(docId) {
     }
 }
 
+// Updates write the document data only. Page images never change after creation,
+// and re-uploading them on every filled field cost signers megabytes per tap.
 async function firebaseUpdateDoc(doc) {
     if (!smoovFirestoreReady || !smoovDb) return false;
     try {
-        await smoovDb.collection('smoov_docs').doc(doc.id).set(_stripImages(doc));
-        if (doc.docImage || (doc.docPages && doc.docPages.length)) {
-            _saveImageChunks(doc.id, doc.docImage, doc.docPages).catch(e => console.warn('Image chunks bg error:', e));
+        const stripped = _stripImages(doc);
+        if (_smoovDocBytes(stripped) > _SMOOV_DOC_MAX_BYTES) {
+            console.warn('Firestore update doc: document too large', doc.id);
+            window._smoovLastSaveError = 'too_large';
+            return false;
         }
+        await smoovDb.collection('smoov_docs').doc(doc.id).set(stripped);
+        window._smoovLastSaveError = null;
         return true;
     } catch (err) {
         console.warn('Firestore update doc error:', err);
+        window._smoovLastSaveError = (err && err.code) || 'error';
         return false;
     }
 }
@@ -299,7 +391,7 @@ async function firebaseLoadTemplate(tplId) {
     try {
         const snap = await smoovDb.collection('smoov_docs').doc(tplId).get();
         if (!snap.exists) { console.warn('Template not found in Firebase:', tplId); return null; }
-        const data = snap.data();
+        const data = _smoovSanitizeDoc(snap.data(), snap.id);
         console.log('[tpl-load] Firebase data fields:', (data.fields||[]).map(f => ({type:f.type, label:f.label})));
         // Load images from chunks
         const imgs = await _loadImageChunks(tplId);

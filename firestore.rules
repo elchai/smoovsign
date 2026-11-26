@@ -1,0 +1,104 @@
+rules_version = '2';
+
+// SmoovSign Firestore rules (replaces the open "allow all until 2029" rule).
+//
+// Model: a document is a capability. Whoever holds the signing link (#sign/<id>)
+// may read it and fill it, without logging in. Everything beyond that is closed:
+//  - nobody can enumerate documents, except an owner listing their own (createdBy == their email)
+//  - only the owner can delete, change ownership, the webhook target, or edit templates
+//  - a completed document is frozen for non-owners (only audit entries may be appended)
+//  - user profiles are private to their user and the plan field is server-side only
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myEmail() {
+      return signedIn() ? request.auth.token.get('email', '') : '';
+    }
+
+    function isOwnerOf(data) {
+      return signedIn() && (
+        (data.get('ownerUid', '') != '' && data.get('ownerUid', '') == request.auth.uid) ||
+        (data.get('createdBy', '') != '' && data.get('createdBy', '') == myEmail())
+      );
+    }
+
+    function safeId(id) {
+      return id.matches('^[A-Za-z0-9_.-]{1,120}$');
+    }
+
+    function isTemplateId(id) {
+      return id.matches('^tpl_.*');
+    }
+
+    function unchanged(key) {
+      return request.resource.data.get(key, null) == resource.data.get(key, null);
+    }
+
+    match /smoov_docs/{docId} {
+      allow get: if true;
+
+      // The dashboard sync queries where('createdBy', '==', <my email>)
+      allow list: if signedIn() && resource.data.createdBy == myEmail();
+
+      allow create: if safeId(docId)
+        && request.resource.data.get('id', docId) == docId
+        && (!isTemplateId(docId) || isOwnerOf(request.resource.data));
+
+      allow update: if request.resource.data.get('id', docId) == docId && (
+        isOwnerOf(resource.data) || (
+          !isTemplateId(docId)
+          && unchanged('createdBy')
+          && unchanged('ownerUid')
+          && unchanged('webhookUrl')
+          && unchanged('webhookMeta')
+          && unchanged('makeWebhookUrl')
+          && (
+            resource.data.get('status', '') != 'completed'
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['audit', '_viewed'])
+          )
+        )
+      );
+
+      allow delete: if isOwnerOf(resource.data);
+
+      // Page images, split into ~750KB chunks.
+      // Create stays open (a signer filling a template link creates the copy's chunks).
+      // Replacing or deleting existing chunks is for the owner only.
+      match /img_chunks/{chunkId} {
+        allow read: if true;
+        allow create: if chunkId.matches('^(c_[0-9]+|img_[0-9]+|_meta)$');
+        allow update, delete: if isOwnerOf(get(/databases/$(database)/documents/smoov_docs/$(docId)).data);
+      }
+    }
+
+    match /smoov_users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.get('plan', 'trial') in ['trial', 'full']
+        && (request.resource.data.get('plan', 'trial') == 'trial' || myEmail() in [
+          'elchaifinn@gmail.com',
+          'office.liatfine@gmail.com',
+          'sodot.ahava@gmail.com',
+          'gdud1875idf@gmail.com'
+        ]);
+      allow update: if signedIn() && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'uid']);
+      allow delete: if false;
+    }
+
+    // Legacy read-only share links (collection is currently empty)
+    match /shared_documents/{linkId} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // Anything else is closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

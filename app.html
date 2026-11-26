@@ -30,13 +30,13 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js?v=20"></script>
+    <script src="firebase-config.js?v=21"></script>
     <!-- PDF generation: jsPDF + html2canvas (jsdelivr CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <!-- EmailJS SDK for email notifications -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-    <script src="email-config.js?v=20"></script>
+    <script src="email-config.js?v=21"></script>
 </head>
 <body>
     <!-- Top Navigation -->
@@ -57,7 +57,7 @@
             <!-- User Menu -->
             <div class="user-menu" id="userMenu" style="display:none;">
                 <button class="user-avatar-btn" onclick="toggleUserDropdown()">
-                    <img id="userAvatar" src="" alt="user" class="user-avatar">
+                    <img id="userAvatar" src="" alt="תמונת פרופיל" class="user-avatar">
                     <span id="userNameTopbar" style="font-size:0.85em;font-weight:600;margin-right:6px;"></span>
                 </button>
                 <div class="user-dropdown hidden" id="userDropdown">
@@ -72,7 +72,7 @@
                     </button>
                 </div>
             </div>
-            <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="תפריט">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
         </div>
@@ -185,8 +185,8 @@
     </div>
 
     <!-- Toast -->
-    <div id="toast" class="toast hidden"></div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=42"></script>
+    <script src="app.js?v=43"></script>
 </body>
 </html>
